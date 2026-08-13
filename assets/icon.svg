@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6EA8FF"/>
+      <stop offset="0.55" stop-color="#5B6EF5"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="folderGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DCE4FB"/>
+    </linearGradient>
+    <linearGradient id="boltGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFE066"/>
+      <stop offset="1" stop-color="#FFB020"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#1B1140" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)"/>
+
+  <!-- speed / motion lines -->
+  <g stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="11" stroke-linecap="round">
+    <line x1="34" y1="86" x2="78" y2="86"/>
+    <line x1="24" y1="122" x2="84" y2="122"/>
+    <line x1="34" y1="158" x2="78" y2="158"/>
+  </g>
+
+  <!-- folder body -->
+  <g filter="url(#soft)">
+    <path d="M76 92 h38 l16 18 h72 a12 12 0 0 1 12 12 v82 a12 12 0 0 1 -12 12 H76
+             a12 12 0 0 1 -12 -12 V104 a12 12 0 0 1 12 -12 Z" fill="url(#folderGrad)"/>
+  </g>
+
+  <!-- lightning bolt, overlapping the folder to read as "fast copy" -->
+  <path d="M158 82 L104 158 h34 l-16 68 76 -94 h-36 z"
+        fill="url(#boltGrad)" stroke="#B9770E" stroke-width="3" stroke-linejoin="round"/>
+</svg>

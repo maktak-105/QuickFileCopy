@@ -1,0 +1,19 @@
+[project]
+name = "fastestcopy"
+version = "0.1.0"
+description = "Windows標準/Robocopyより高速なファイルコピーアプリ"
+requires-python = ">=3.11"
+dependencies = [
+    "pywin32",
+    "PySide6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "nuitka"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
