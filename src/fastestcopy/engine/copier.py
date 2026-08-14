@@ -29,7 +29,7 @@ def _copy_small_job(
     try:
         action = resolve_conflict(job.src, job.dst, policy, ask_callback)
         if action is ConflictAction.SKIP:
-            stats.add_skip()
+            stats.add_skip(job.size)
             return
         winio.raw_copy_file(job.src, job.dst, buffer_size)
         # CopyFileExW already preserves last-write-time and attributes.
@@ -54,7 +54,7 @@ def _copy_large_job(
     try:
         action = resolve_conflict(job.src, job.dst, policy, ask_callback)
         if action is ConflictAction.SKIP:
-            stats.add_skip()
+            stats.add_skip(job.size)
             return
         winio.copy_large_file_parallel(
             job.src,

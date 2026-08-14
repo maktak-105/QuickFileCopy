@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QSplitter,
     QStatusBar,
@@ -18,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from fastestcopy.engine.policy import ConflictPolicy
 
-from .copy_dialog import ConflictAsker, CopyProgressDialog, CopyWorker
+from .copy_dialog import ConflictAsker, CopyProgressDialog, CopyWorker, format_eta
 from .elevate import is_admin, relaunch_as_admin
 from .file_pane import FilePane
 from .settings_dialog import CopySettings, SettingsDialog
@@ -58,6 +59,11 @@ class MainWindow(QMainWindow):
         self.copy_button.setFixedHeight(40)
         self.copy_button.clicked.connect(self._on_copy_clicked)
 
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        self.progress_label = QLabel("")
+        self.progress_label.setWordWrap(True)
+
         self.privilege_label = QLabel(
             "管理者権限: あり\n(巨大ファイル高速化 有効)"
             if is_admin()
@@ -73,6 +79,8 @@ class MainWindow(QMainWindow):
         center_layout.addWidget(self.policy_combo)
         center_layout.addWidget(self.show_hidden_checkbox)
         center_layout.addWidget(self.copy_button)
+        center_layout.addWidget(self.progress_bar)
+        center_layout.addWidget(self.progress_label)
         center_layout.addWidget(self.privilege_label)
         center_layout.addStretch()
 
@@ -187,17 +195,39 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         worker.progress.connect(dialog.update_progress)
+        worker.progress.connect(self._update_center_progress)
         worker.finished_ok.connect(lambda snap: self._on_copy_done(dialog, snap))
         worker.failed.connect(dialog.show_failed)
+        worker.failed.connect(self._clear_center_progress)
         dialog.cancel_requested.connect(worker.cancel)
 
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)
         self.worker = worker
         worker.start()
         dialog.exec()
         self.target_pane.refresh()
 
+    def _update_center_progress(self, snap: dict) -> None:
+        lines = [f"{snap['files_copied']} ファイル / {snap['bytes_copied'] / (1024 * 1024):.1f} MB"]
+        if snap["progress_pct"] is not None:
+            self.progress_bar.setRange(0, 1000)
+            self.progress_bar.setValue(int(snap["progress_pct"] * 10))
+            lines.append(f"進捗: {snap['progress_pct']:.1f}%")
+            if snap["eta_sec"] is not None:
+                lines.append(f"残り約 {format_eta(snap['eta_sec'])}")
+        else:
+            self.progress_bar.setRange(0, 0)  # still scanning: total size not known yet
+            lines.append("スキャン中...")
+        self.progress_label.setText("\n".join(lines))
+
+    def _clear_center_progress(self, *_args) -> None:
+        self.progress_bar.setVisible(False)
+        self.progress_label.setText("")
+
     def _on_copy_done(self, dialog: CopyProgressDialog, snap: dict) -> None:
         dialog.show_done(snap)
+        self._clear_center_progress()
         self.statusBar().showMessage(
             f"完了: {snap['files_copied']} ファイル, "
             f"{snap['bytes_copied'] / (1024 * 1024):.1f} MB, "

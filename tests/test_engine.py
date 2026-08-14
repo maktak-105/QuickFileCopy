@@ -201,6 +201,32 @@ def test_timestamps_preserved(tmp_path):
     assert abs(src_mtime - dst_mtime) < 1.0
 
 
+def test_progress_reaches_100_percent_even_with_all_skipped(tmp_path):
+    """progress_pct/eta_sec are only meaningful once scanning is done, and
+    must reach 100% regardless of how many files end up skipped - skipped
+    bytes count as "processed" for this purpose even though they're not
+    reflected in bytes_copied (which stays throughput-only).
+    """
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    src.mkdir()
+    _make_tree(src, {"a.txt": b"x" * 1000, "b.txt": b"y" * 2000})
+
+    stats = run_copy(str(src), str(dst), policy=ConflictPolicy.SKIP)
+    snap = stats.snapshot()
+    assert snap["scan_done"] is True
+    assert snap["total_bytes_found"] == 3000
+    assert snap["progress_pct"] == pytest.approx(100.0)
+
+    # re-run: both files now exist unchanged, so everything gets skipped -
+    # bytes_copied stays 0, but progress must still reach 100%, not stall.
+    stats2 = run_copy(str(src), str(dst), policy=ConflictPolicy.SKIP)
+    snap2 = stats2.snapshot()
+    assert snap2["files_skipped"] == 2
+    assert snap2["bytes_copied"] == 0
+    assert snap2["progress_pct"] == pytest.approx(100.0)
+
+
 def test_run_copy_multi_keeps_each_item_own_name(tmp_path):
     """Multi-select paste: unlike run_copy (which merges src's contents
     into dst), each selected item - file or folder - keeps its own name

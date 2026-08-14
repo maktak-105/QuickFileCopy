@@ -23,6 +23,18 @@ from fastestcopy.engine.copier import run_copy, run_copy_multi
 from fastestcopy.engine.policy import ConflictAction, ConflictPolicy
 
 
+def format_eta(seconds: float) -> str:
+    """1時間2分 / 3分45秒 / 12秒 - drops the leading unit(s) that are zero."""
+    seconds = max(int(seconds), 0)
+    hours, rem = divmod(seconds, 3600)
+    minutes, secs = divmod(rem, 60)
+    if hours:
+        return f"{hours}時間{minutes}分"
+    if minutes:
+        return f"{minutes}分{secs}秒"
+    return f"{secs}秒"
+
+
 class ConflictAsker(QObject):
     """Lets a background copy thread block on a modal Qt dialog running on
     the GUI thread. Qt.BlockingQueuedConnection makes the emitting
@@ -163,11 +175,20 @@ class CopyProgressDialog(QDialog):
 
     @Slot(dict)
     def update_progress(self, snap: dict) -> None:
-        self.info_label.setText(
-            f"{snap['files_copied']} ファイル / {snap['bytes_copied'] / (1024 * 1024):.1f} MB コピー済み\n"
-            f"{snap['mb_per_sec']:.1f} MB/s, {snap['files_per_sec']:.0f} files/s\n"
-            f"スキップ: {snap['files_skipped']} 件, エラー: {snap['error_count']} 件"
-        )
+        lines = [
+            f"{snap['files_copied']} ファイル / {snap['bytes_copied'] / (1024 * 1024):.1f} MB コピー済み",
+            f"{snap['mb_per_sec']:.1f} MB/s, {snap['files_per_sec']:.0f} files/s",
+            f"スキップ: {snap['files_skipped']} 件, エラー: {snap['error_count']} 件",
+        ]
+        if snap["progress_pct"] is not None:
+            self.progress_bar.setRange(0, 1000)
+            self.progress_bar.setValue(int(snap["progress_pct"] * 10))
+            lines.append(f"進捗: {snap['progress_pct']:.1f}%")
+            if snap["eta_sec"] is not None:
+                lines.append(f"残り時間(予測): {format_eta(snap['eta_sec'])}")
+        else:
+            self.progress_bar.setRange(0, 0)  # still scanning: total size not known yet
+        self.info_label.setText("\n".join(lines))
 
     def show_done(self, snap: dict) -> None:
         self._done = True

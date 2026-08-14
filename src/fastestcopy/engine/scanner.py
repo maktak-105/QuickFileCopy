@@ -52,6 +52,7 @@ def _scan_dir_tree(
                 else:
                     st = entry.stat(follow_symlinks=False)
                     job_queue.put(CopyJob(entry.path, dst_path, st.st_size, st.st_mtime_ns))
+                    stats.add_found(st.st_size)
             except OSError as e:
                 stats.add_error(entry.path, e)
 
@@ -69,10 +70,12 @@ def scan_and_enqueue(
         stats.add_dir()
     except OSError as e:
         stats.add_error(dst_root, e)
+        stats.mark_scan_done()
         scan_done.set()
         return
 
     _scan_dir_tree(src_root, dst_root, job_queue, stats, stop_event)
+    stats.mark_scan_done()
     scan_done.set()
 
 
@@ -101,6 +104,8 @@ def scan_items_and_enqueue(
             else:
                 st = os.stat(src)
                 job_queue.put(CopyJob(src, dst, st.st_size, st.st_mtime_ns))
+                stats.add_found(st.st_size)
         except OSError as e:
             stats.add_error(src, e)
+    stats.mark_scan_done()
     scan_done.set()
