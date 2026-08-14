@@ -155,29 +155,21 @@ class MainWindow(QMainWindow):
         dst_abs = os.path.normcase(os.path.abspath(dst))
 
         rows = self.source_pane.selected_rows()
-        # A multi-selection, or a single selected *file*, has no one root
-        # whose contents can merge into dst - each item keeps its own name
-        # there instead (Explorer-style paste). A single selected folder
-        # (or nothing selected, falling back to the pane's current folder)
-        # keeps the original merge-its-contents-into-dst behavior.
-        multi = len(rows) >= 2 or (len(rows) == 1 and not os.path.isdir(rows[0]))
+        # Nothing explicitly selected -> fall back to whatever folder the
+        # pane is showing/has selected as a single-item source.
+        sources = rows if rows else [self.source_pane.selected_path()]
+        if not sources[0] or not os.path.exists(sources[0]):
+            QMessageBox.warning(self, "エラー", "コピー元を選択してください。")
+            return
 
-        if multi:
-            items = []
-            for src in rows:
-                if not self._validate_copy_pair(src, dst_abs):
-                    return
-                items.append((src, os.path.join(dst, os.path.basename(src.rstrip("\\/")))))
-            merge = False
-        else:
-            src = rows[0] if rows else self.source_pane.selected_path()
-            if not src or not os.path.isdir(src):
-                QMessageBox.warning(self, "エラー", "コピー元フォルダを選択してください。")
-                return
+        # Every item - file or folder - keeps its own name at dst, same as
+        # an Explorer paste: a folder becomes a same-named subfolder there
+        # rather than merging its contents directly into dst.
+        items = []
+        for src in sources:
             if not self._validate_copy_pair(src, dst_abs):
                 return
-            items = [(src, dst)]
-            merge = True
+            items.append((src, os.path.join(dst, os.path.basename(src.rstrip("\\/")))))
 
         policy = _POLICY_LABELS[self.policy_combo.currentText()]
         ask_cb = self.conflict_asker.ask if policy is ConflictPolicy.ASK else None
@@ -185,7 +177,6 @@ class MainWindow(QMainWindow):
         dialog = CopyProgressDialog(self)
         worker = CopyWorker(
             items,
-            merge,
             policy,
             ask_callback=ask_cb,
             small_workers=self.settings.small_workers,

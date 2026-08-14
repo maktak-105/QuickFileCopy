@@ -21,6 +21,7 @@ from __future__ import annotations
 import ctypes
 import math
 import os
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from ctypes import wintypes
 from typing import Callable, Optional
@@ -84,6 +85,13 @@ DEFAULT_BUFFER_SIZE = 4 * 1024 * 1024  # 4MB transfer buffer for the chunked lar
 DEFAULT_MIN_CHUNK_SIZE = 32 * 1024 * 1024  # don't split a large file into pieces smaller than this
 
 _privilege_cache: dict[str, bool] = {}
+
+
+class CopyCancelled(Exception):
+    """Raised mid-transfer when stop_event is set, so a cancel during a
+    huge file takes effect within one buffer_size read/write instead of
+    only being noticed between whole-file jobs.
+    """
 
 
 class WinIOError(OSError):
@@ -171,7 +179,12 @@ def raw_copy_file(src: str, dst: str, buffer_size: int = DEFAULT_BUFFER_SIZE) ->
 
 
 def _copy_sequential(
-    src: str, dst: str, size: int, buffer_size: int, on_bytes: Optional[Callable[[int], None]]
+    src: str,
+    dst: str,
+    size: int,
+    buffer_size: int,
+    on_bytes: Optional[Callable[[int], None]],
+    stop_event: Optional[threading.Event] = None,
 ) -> None:
     """Single-stream read/write loop. Writes always land at the current
     end-of-file, so the destination grows naturally with no gap for NTFS to
@@ -188,6 +201,8 @@ def _copy_sequential(
         bytes_written = wintypes.DWORD(0)
         remaining = size
         while remaining > 0:
+            if stop_event is not None and stop_event.is_set():
+                raise CopyCancelled(dst)
             to_read = min(buffer_size, remaining)
             if not _k32.ReadFile(s_h, buf, to_read, ctypes.byref(bytes_read), None):
                 raise WinIOError(src, "ReadFile")
@@ -214,6 +229,7 @@ def copy_large_file_parallel(
     preallocate: bool = True,
     min_chunk_size: int = DEFAULT_MIN_CHUNK_SIZE,
     on_bytes: Optional[Callable[[int], None]] = None,
+    stop_event: Optional[threading.Event] = None,
 ) -> None:
     """Copy a large file by splitting it into byte-range chunks copied by
     separate threads in parallel, each with its own file handles - but only
@@ -236,7 +252,7 @@ def copy_large_file_parallel(
 
     can_prealloc = preallocate and has_manage_volume_privilege()
     if not can_prealloc:
-        _copy_sequential(src, dst, size, buffer_size, on_bytes)
+        _copy_sequential(src, dst, size, buffer_size, on_bytes, stop_event)
         return
 
     dst_h = _create_file(
@@ -283,6 +299,8 @@ def copy_large_file_parallel(
             bytes_written = wintypes.DWORD(0)
             remaining = end - start
             while remaining > 0:
+                if stop_event is not None and stop_event.is_set():
+                    raise CopyCancelled(dst)
                 to_read = min(buffer_size, remaining)
                 if not _k32.ReadFile(s_h, buf, to_read, ctypes.byref(bytes_read), None):
                     raise WinIOError(src, "ReadFile")

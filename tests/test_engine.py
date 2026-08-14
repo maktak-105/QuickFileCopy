@@ -1,6 +1,7 @@
 import filecmp
 import hashlib
 import os
+import threading
 import time
 
 import pytest
@@ -199,6 +200,83 @@ def test_timestamps_preserved(tmp_path):
     src_mtime = os.stat(src / "a.txt").st_mtime
     dst_mtime = os.stat(dst / "a.txt").st_mtime
     assert abs(src_mtime - dst_mtime) < 1.0
+
+
+def test_copy_large_file_parallel_stops_mid_transfer(tmp_path):
+    """A stop_event set partway through a chunked/sequential large-file
+    copy must abort within that transfer, not only be checked between
+    whole files - otherwise cancelling during one huge file waits for it
+    to finish regardless.
+    """
+    from fastestcopy.engine import winio
+
+    src = tmp_path / "big.bin"
+    dst = tmp_path / "big_copy.bin"
+    total_size = 5 * 1024 * 1024
+    src.write_bytes(os.urandom(total_size))
+
+    stop_event = threading.Event()
+    seen = {"bytes": 0}
+
+    def on_bytes(n):
+        seen["bytes"] += n
+        if seen["bytes"] >= 512 * 1024:  # cancel partway through, deterministically
+            stop_event.set()
+
+    with pytest.raises(winio.CopyCancelled):
+        winio.copy_large_file_parallel(
+            str(src),
+            str(dst),
+            total_size,
+            buffer_size=64 * 1024,
+            preallocate=False,
+            on_bytes=on_bytes,
+            stop_event=stop_event,
+        )
+
+    assert 0 < seen["bytes"] < total_size
+
+
+def test_run_copy_cancel_mid_large_file_cleans_up_partial_file(tmp_path, monkeypatch):
+    """End-to-end through run_copy: cancelling mid-copy of a large file
+    must not be recorded as an error, and shouldn't leave a truncated
+    partial file behind that could be mistaken for a complete one.
+
+    Triggers the cancel from inside CopyStats.add_bytes (called once per
+    buffer-sized chunk, same as the winio-level test above) rather than on
+    a wall-clock delay, so this can't be flaky by the file finishing before
+    a timer fires.
+    """
+    from fastestcopy.engine.stats import CopyStats
+
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    src.mkdir()
+    (src / "big.bin").write_bytes(os.urandom(5 * 1024 * 1024))
+
+    stop_event = threading.Event()
+    original_add_bytes = CopyStats.add_bytes
+
+    def add_bytes_and_maybe_cancel(self, n):
+        original_add_bytes(self, n)
+        if self.bytes_copied >= 512 * 1024:
+            stop_event.set()
+
+    monkeypatch.setattr(CopyStats, "add_bytes", add_bytes_and_maybe_cancel)
+
+    stats = run_copy(
+        str(src),
+        str(dst),
+        policy=ConflictPolicy.SKIP,
+        small_threshold=1,  # force this file onto the chunked/large path
+        buffer_size=64 * 1024,
+        preallocate_large=False,
+        stop_event=stop_event,
+    )
+    snap = stats.snapshot()
+
+    assert snap["error_count"] == 0
+    assert not (dst / "big.bin").exists()
 
 
 def test_progress_reaches_100_percent_even_with_all_skipped(tmp_path):

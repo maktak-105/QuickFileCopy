@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtCore import QObject
 
-from fastestcopy.engine.copier import run_copy, run_copy_multi
+from fastestcopy.engine.copier import run_copy_multi
 from fastestcopy.engine.policy import ConflictAction, ConflictPolicy
 
 from .copy_log import write_error_log
@@ -90,7 +90,6 @@ class CopyWorker(QThread):
     def __init__(
         self,
         items: list[tuple[str, str]],
-        merge: bool,
         policy: ConflictPolicy,
         ask_callback=None,
         small_workers: Optional[int] = None,
@@ -99,14 +98,13 @@ class CopyWorker(QThread):
         preallocate_large: bool = True,
         parent=None,
     ):
-        """items: [(src, dst), ...] to copy. When merge is True, items must
-        be a single pair and src's *contents* merge into dst (the classic
-        one-folder-into-another mode); otherwise each item is copied
-        keeping its own name at its own dst (a multi-selection paste).
+        """items: [(src, dst), ...] to copy, each keeping its own name at
+        its own dst (Explorer-style paste) - a single selected folder
+        becomes one item, so it lands as a same-named subfolder rather
+        than merging its contents into dst.
         """
         super().__init__(parent)
         self.items = items
-        self.merge = merge
         self.policy = policy
         self.ask_callback = ask_callback
         self.small_workers = small_workers
@@ -130,11 +128,7 @@ class CopyWorker(QThread):
                 progress_cb=lambda snap: self.progress.emit(snap),
                 stop_event=self.stop_event,
             )
-            if self.merge:
-                src, dst = self.items[0]
-                stats = run_copy(src, dst, **kwargs)
-            else:
-                stats = run_copy_multi(self.items, **kwargs)
+            stats = run_copy_multi(self.items, **kwargs)
             self.finished_ok.emit(stats.snapshot())
         except Exception:  # noqa: BLE001 - full traceback, not just str(e), goes to the error log
             self.failed.emit(traceback.format_exc())

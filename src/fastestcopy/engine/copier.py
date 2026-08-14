@@ -3,6 +3,7 @@ whole-copy pool, large-file chunked-parallel pool) running concurrently.
 """
 from __future__ import annotations
 
+import os
 import queue
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -64,9 +65,18 @@ def _copy_large_job(
             buffer_size=buffer_size,
             preallocate=preallocate,
             on_bytes=stats.add_bytes,
+            stop_event=stop_event,
         )
         winio.copy_file_times_and_attrs(job.src, job.dst)
         stats.add_file()
+    except winio.CopyCancelled:
+        # Not a real error - the user cancelled mid-transfer. Remove the
+        # partial destination file rather than leaving a truncated one
+        # that looks complete.
+        try:
+            os.remove(job.dst)
+        except OSError:
+            pass
     except Exception as e:  # noqa: BLE001
         stats.add_error(job.src, e)
 
