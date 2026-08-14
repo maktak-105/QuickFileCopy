@@ -81,6 +81,32 @@ def run_robocopy(src: str, dst: str, mt: int, label: str) -> dict:
     }
 
 
+def run_fastcopy(fcp_path: str, src: str, dst: str) -> dict:
+    """Benchmark FastCopy via its dedicated CLI tool (fcp.exe, not the GUI
+    FastCopy.exe) in silent mode. `src\\*` (not bare `src`) is required so
+    FastCopy copies the tree's *contents* into dst, matching how robocopy
+    /E and our own engine are benchmarked here - passing `src` alone would
+    instead nest it as dst\\<src folder name>\\..., an unfair file layout
+    to compare against.
+    """
+    _clean(dst)
+    src_glob = os.path.join(src, "*")
+    t0 = time.perf_counter()
+    proc = subprocess.run(
+        [fcp_path, "/cmd=force_copy", "/no_ui", "/auto_close", src_glob, f"/to={dst}\\"],
+        capture_output=True, text=True,
+    )
+    elapsed = time.perf_counter() - t0
+    files, total_bytes = _dir_stats(dst)
+    return {
+        "engine": "FastCopy",
+        "elapsed_sec": elapsed,
+        "files": files,
+        "bytes": total_bytes,
+        "errors": 0 if proc.returncode == 0 else proc.returncode,
+    }
+
+
 def run_exe(exe_path: str, src: str, dst: str) -> dict:
     """Benchmark the actually-compiled Nuitka artifact (not the Python
     source under the interpreter) by shelling out to it, same as robocopy.
@@ -125,6 +151,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--out", default=None, help="path to write raw JSON results")
     p.add_argument("--skip-robocopy", action="store_true")
     p.add_argument("--exe", default=None, help="path to compiled FastestCopy CLI exe to benchmark")
+    p.add_argument("--fastcopy", default=None, help="path to fcp.exe (FastCopy's CLI tool) to benchmark")
     args = p.parse_args(argv)
 
     os.makedirs(args.work, exist_ok=True)
@@ -144,6 +171,11 @@ def main(argv: list[str] | None = None) -> None:
         engines.append((
             "fastestcopy_exe",
             lambda: run_exe(args.exe, args.src, os.path.join(args.work, "dst_fastestcopy_exe")),
+        ))
+    if args.fastcopy:
+        engines.append((
+            "fastcopy",
+            lambda: run_fastcopy(args.fastcopy, args.src, os.path.join(args.work, "dst_fastcopy")),
         ))
     if not args.skip_robocopy:
         engines.append((
