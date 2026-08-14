@@ -32,6 +32,24 @@ _POLICY_LABELS = {
 }
 
 
+def _dest_name_for(src: str) -> str:
+    """Name to paste `src` under at the destination. Usually just its own
+    basename, but a bare drive or UNC share root (e.g. "C:\\" or
+    "\\\\server\\share") has no basename via os.path.basename - that
+    returns "" for both, which would silently collapse the paste into
+    dst itself instead of a subfolder - so fall back to a name derived
+    from the drive letter / host+share instead.
+    """
+    name = os.path.basename(src.rstrip("\\/"))
+    if name:
+        return name
+    drive, _tail = os.path.splitdrive(src)
+    drive = drive.strip("\\")
+    if drive.endswith(":"):
+        return drive.rstrip(":")  # "C:" -> "C"
+    return drive.replace("\\", "_") or "root"  # "\\SERVER\Share" -> "SERVER_Share"
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -142,7 +160,12 @@ class MainWindow(QMainWindow):
         if src_abs == dst_abs:
             QMessageBox.warning(self, "エラー", "コピー元とコピー先が同じフォルダです。")
             return False
-        if dst_abs.startswith(src_abs + os.sep):
+        # A drive/UNC share root's abspath already ends in a separator
+        # (e.g. "c:\\"), so appending another os.sep below would double it
+        # up and silently defeat this check - strip any trailing separator
+        # first so the prefix always ends in exactly one.
+        src_prefix = src_abs.rstrip(os.sep) + os.sep
+        if dst_abs.startswith(src_prefix):
             QMessageBox.warning(self, "エラー", "コピー先がコピー元の内部にあります。")
             return False
         return True
@@ -169,7 +192,7 @@ class MainWindow(QMainWindow):
         for src in sources:
             if not self._validate_copy_pair(src, dst_abs):
                 return
-            items.append((src, os.path.join(dst, os.path.basename(src.rstrip("\\/")))))
+            items.append((src, os.path.join(dst, _dest_name_for(src))))
 
         policy = _POLICY_LABELS[self.policy_combo.currentText()]
         ask_cb = self.conflict_asker.ask if policy is ConflictPolicy.ASK else None
