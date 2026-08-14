@@ -41,9 +41,10 @@ class MainWindow(QMainWindow):
         self.conflict_asker = ConflictAsker(self)
         self.worker: CopyWorker | None = None
 
-        start_dir = os.path.expanduser("~")
-        self.source_pane = FilePane(start_dir, "ソース")
-        self.target_pane = FilePane(start_dir, "ターゲット")
+        # Start on the drive-list ("This PC") view rather than drilling into
+        # the user folder, so the nav tree opens uncommitted to any drive.
+        self.source_pane = FilePane(None, "ソース")
+        self.target_pane = FilePane(None, "ターゲット")
 
         self.policy_combo = QComboBox()
         for label in _POLICY_LABELS:

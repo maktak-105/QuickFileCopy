@@ -56,7 +56,7 @@ COMPUTER_ROLE = Qt.UserRole + 2
 class FilePane(QWidget):
     path_changed = Signal(str)
 
-    def __init__(self, initial_path: str, title: str, parent=None):
+    def __init__(self, initial_path: str | None, title: str, parent=None):
         super().__init__(parent)
 
         self.model = QFileSystemModel(self)
@@ -114,7 +114,10 @@ class FilePane(QWidget):
         self.computer_button.clicked.connect(self.show_computer)
 
         self.current_path = COMPUTER
-        self.set_path(initial_path)
+        if initial_path:
+            self.set_path(initial_path)
+        else:
+            self.show_computer()
 
     # -- nav tree (PC / ネットワーク grouping, lazy-loaded) -----------------
 
