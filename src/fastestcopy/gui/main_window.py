@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from fastestcopy.engine import diskspace
 from fastestcopy.engine.policy import ConflictPolicy
 
 from .copy_dialog import (
@@ -48,6 +49,12 @@ _POLICY_KEYS = {
     ConflictPolicy.OVERWRITE_IF_NEWER: "policy_overwrite_if_newer",
     ConflictPolicy.ASK: "policy_ask",
 }
+
+# Below this, starting a copy is pointless regardless of how much the
+# source actually needs - used as a cheap upfront guard on the direct-copy
+# path, which (unlike scan-then-copy) has no pre-scanned total to compare
+# against.
+_MIN_FREE_BYTES = 1024 * 1024
 
 
 def _dest_name_for(src: str) -> str:
@@ -284,6 +291,16 @@ class MainWindow(QMainWindow):
         if items is None:
             return
 
+        dst = self.target_pane.selected_path()
+        free = diskspace.free_bytes(dst)
+        if free < _MIN_FREE_BYTES:
+            QMessageBox.warning(
+                self,
+                tr("space_warning_none_title"),
+                tr("space_warning_none_body").format(free=f"{free / (1024 * 1024):.1f}"),
+            )
+            return
+
         policy = self._current_policy()
         ask_cb = self.conflict_asker.ask if policy is ConflictPolicy.ASK else None
 
@@ -344,8 +361,13 @@ class MainWindow(QMainWindow):
             )
             return
 
+        dst = self.target_pane.selected_path()
+        free = diskspace.free_bytes(dst)
         reply = QMessageBox.question(
-            self, tr("copy_confirm_title"), format_preview_summary(result), QMessageBox.Yes | QMessageBox.No
+            self,
+            tr("copy_confirm_title"),
+            format_preview_summary(result, free_bytes=free),
+            QMessageBox.Yes | QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return

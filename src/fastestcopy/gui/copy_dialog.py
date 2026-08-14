@@ -310,9 +310,11 @@ class ScanProgressDialog(QDialog):
         self.info_label.setText(tr("cancelling"))
 
 
-def format_preview_summary(result: PreviewResult) -> str:
+def format_preview_summary(result: PreviewResult, free_bytes: Optional[int] = None) -> str:
     """Confirmation text shown before an actually-scanned copy starts:
-    how many of the total were already up to date vs. need copying.
+    how many of the total were already up to date vs. need copying, plus
+    a free-space warning if `free_bytes` (the destination drive's current
+    free space) can't cover what the scan found to copy.
     """
     mb = f"{result.copy_bytes / (1024 * 1024):.1f}"
     lines = [
@@ -324,6 +326,10 @@ def format_preview_summary(result: PreviewResult) -> str:
         lines.append(tr("preview_to_ask").format(n=len(result.to_ask)))
     if result.errors:
         lines.append(tr("preview_errors").format(n=len(result.errors)))
+    if free_bytes is not None and free_bytes < result.copy_bytes:
+        free_mb = f"{free_bytes / (1024 * 1024):.1f}"
+        lines.append("")
+        lines.append(tr("preview_space_warning").format(required=mb, free=free_mb))
     lines.append("")
     lines.append(tr("preview_confirm_prompt"))
     return "\n".join(lines)

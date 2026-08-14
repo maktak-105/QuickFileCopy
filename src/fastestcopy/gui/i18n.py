@@ -122,9 +122,20 @@ _STRINGS: dict[str, dict[str, str]] = {
         "en": "Needs confirmation (conflicts): {n} items - asked live during the copy",
     },
     "preview_errors": {"ja": "スキャン中のエラー: {n} 件", "en": "Errors during scan: {n}"},
+    "preview_space_warning": {
+        "ja": "⚠ 空き容量が不足している可能性があります (必要: {required} MB / 空き: {free} MB)",
+        "en": "⚠ May not have enough free space (needed: {required} MB / free: {free} MB)",
+    },
     "preview_confirm_prompt": {
         "ja": "この内容でコピーを開始しますか?",
         "en": "Start the copy with this plan?",
+    },
+    "space_warning_none_title": {"ja": "空き容量がありません", "en": "No Free Space"},
+    "space_warning_none_body": {
+        "ja": "コピー先ドライブに空き容量がほとんどありません (空き: {free} MB)。\n"
+        "コピー先を確認してください。",
+        "en": "The destination drive has almost no free space left (free: {free} MB).\n"
+        "Please check the destination.",
     },
     # -- FilePane -----------------------------------------------------
     "pc_button": {"ja": "PC", "en": "PC"},

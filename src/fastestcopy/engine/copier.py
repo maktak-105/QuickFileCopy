@@ -17,6 +17,26 @@ from .stats import CopyStats
 ProgressCallback = Callable[[dict], None]
 
 
+def _remove_partial_output(dst: str, expected_size: int) -> None:
+    """Best-effort cleanup of a truncated/partial destination file left
+    behind by a failed copy (e.g. the drive ran out of space mid-write).
+
+    Only removes it if it's smaller than what the source needed to
+    produce: CreateFile(..., CREATE_ALWAYS, ...) truncates any existing
+    destination immediately on open, so once a copy has failed partway
+    through, whatever's left is provably not the original file and not a
+    successful copy either. A destination that's already >= expected_size
+    was never actually written by this attempt (e.g. the source couldn't
+    even be opened before failing) - leave it alone rather than risk
+    deleting an unrelated pre-existing file.
+    """
+    try:
+        if os.path.getsize(dst) < expected_size:
+            os.remove(dst)
+    except OSError:
+        pass
+
+
 def _copy_small_job(
     job: CopyJob,
     policy: ConflictPolicy,
@@ -37,6 +57,7 @@ def _copy_small_job(
         stats.add_bytes(job.size)
         stats.add_file()
     except Exception as e:  # noqa: BLE001 - surfaced via stats, not fatal to the run
+        _remove_partial_output(job.dst, job.size)
         stats.add_error(job.src, e)
 
 
@@ -73,11 +94,9 @@ def _copy_large_job(
         # Not a real error - the user cancelled mid-transfer. Remove the
         # partial destination file rather than leaving a truncated one
         # that looks complete.
-        try:
-            os.remove(job.dst)
-        except OSError:
-            pass
+        _remove_partial_output(job.dst, job.size)
     except Exception as e:  # noqa: BLE001
+        _remove_partial_output(job.dst, job.size)
         stats.add_error(job.src, e)
 
 

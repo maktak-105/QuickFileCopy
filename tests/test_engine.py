@@ -427,6 +427,78 @@ def test_scan_preview_then_run_copy_jobs_copies_only_what_was_flagged(tmp_path):
         assert (dst / f"new{i}.txt").read_bytes() == b"new"
 
 
+def test_remove_partial_output_only_deletes_undersized_file(tmp_path):
+    """Direct unit test of the cleanup helper's safety property: it must
+    only remove a destination that's provably smaller than what the copy
+    was supposed to produce, never a same-or-larger-sized file it might
+    not have actually touched (e.g. the source never even got opened).
+    """
+    from fastestcopy.engine.copier import _remove_partial_output
+
+    partial = tmp_path / "partial.bin"
+    partial.write_bytes(b"ab")  # 2 bytes < expected 10 -> a failed copy's leftovers
+    _remove_partial_output(str(partial), 10)
+    assert not partial.exists()
+
+    untouched = tmp_path / "untouched.bin"
+    untouched.write_bytes(b"0123456789")  # already the expected size -> leave it alone
+    _remove_partial_output(str(untouched), 10)
+    assert untouched.exists()
+
+    _remove_partial_output(str(tmp_path / "missing.bin"), 10)  # must not raise
+
+
+def test_disk_full_during_large_copy_removes_partial_file(tmp_path, monkeypatch):
+    """End-to-end: when the chunked large-file path fails partway (e.g.
+    ERROR_DISK_FULL from WriteFile/SetEndOfFile), the truncated destination
+    file it leaves behind must be cleaned up rather than left as an
+    orphaned partial/zero-byte file, while the failure is still recorded.
+    """
+    from fastestcopy.engine import winio
+
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    src.mkdir()
+    (src / "big.bin").write_bytes(os.urandom(5 * 1024 * 1024))
+
+    def fake_copy_large_file_parallel(src_path, dst_path, size, **kwargs):
+        # CREATE_ALWAYS truncates the destination immediately on open, then
+        # the disk fills up before any/all of the data is written.
+        with open(dst_path, "wb") as f:
+            f.write(b"partial")
+        raise OSError("simulated ERROR_DISK_FULL")
+
+    monkeypatch.setattr(winio, "copy_large_file_parallel", fake_copy_large_file_parallel)
+
+    stats = run_copy(str(src), str(dst), policy=ConflictPolicy.SKIP, small_threshold=1)
+    snap = stats.snapshot()
+
+    assert snap["error_count"] == 1
+    assert not (dst / "big.bin").exists()
+
+
+def test_disk_full_during_small_copy_removes_partial_file(tmp_path, monkeypatch):
+    """Same guarantee as above, for the small-file (CopyFileExW) path."""
+    from fastestcopy.engine import winio
+
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    src.mkdir()
+    (src / "a.txt").write_bytes(b"hello world")
+
+    def fake_raw_copy_file(src_path, dst_path, buffer_size):
+        open(dst_path, "wb").close()  # created, 0 bytes written before the failure
+        raise OSError("simulated ERROR_DISK_FULL")
+
+    monkeypatch.setattr(winio, "raw_copy_file", fake_raw_copy_file)
+
+    stats = run_copy(str(src), str(dst), policy=ConflictPolicy.SKIP)
+    snap = stats.snapshot()
+
+    assert snap["error_count"] == 1
+    assert not (dst / "a.txt").exists()
+
+
 def test_empty_source_tree_produces_no_errors(tmp_path):
     src = tmp_path / "src"
     dst = tmp_path / "dst"
