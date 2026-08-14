@@ -85,6 +85,7 @@ class CopyStats:
                 "mb_per_sec": mb_per_sec,
                 "files_per_sec": self.files_copied / elapsed,
                 "error_count": len(self.errors),
+                "errors": list(self.errors),
                 "done": self.end_time is not None,
                 "total_bytes_found": self.total_bytes_found,
                 "total_files_found": self.total_files_found,

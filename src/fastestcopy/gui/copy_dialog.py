@@ -3,7 +3,9 @@ a blocking "file exists, what do I do?" prompt and a live progress dialog.
 """
 from __future__ import annotations
 
+import os
 import threading
+import traceback
 from typing import Optional
 
 from PySide6.QtCore import Qt, QThread, Signal, Slot
@@ -21,6 +23,8 @@ from PySide6.QtCore import QObject
 
 from fastestcopy.engine.copier import run_copy, run_copy_multi
 from fastestcopy.engine.policy import ConflictAction, ConflictPolicy
+
+from .copy_log import write_error_log
 
 
 def format_eta(seconds: float) -> str:
@@ -132,8 +136,8 @@ class CopyWorker(QThread):
             else:
                 stats = run_copy_multi(self.items, **kwargs)
             self.finished_ok.emit(stats.snapshot())
-        except Exception as e:  # noqa: BLE001
-            self.failed.emit(str(e))
+        except Exception:  # noqa: BLE001 - full traceback, not just str(e), goes to the error log
+            self.failed.emit(traceback.format_exc())
 
 
 class CopyProgressDialog(QDialog):
@@ -151,10 +155,15 @@ class CopyProgressDialog(QDialog):
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 0)  # indeterminate: total size unknown until scan completes
 
+        self.open_log_button = QPushButton("エラーログを開く")
+        self.open_log_button.setVisible(False)
+        self.open_log_button.clicked.connect(self._on_open_log)
+
         self.close_button = QPushButton("キャンセル")
         self.close_button.clicked.connect(self._on_button)
 
         btn_row = QHBoxLayout()
+        btn_row.addWidget(self.open_log_button)
         btn_row.addStretch()
         btn_row.addWidget(self.close_button)
 
@@ -164,6 +173,7 @@ class CopyProgressDialog(QDialog):
         layout.addLayout(btn_row)
 
         self._done = False
+        self.log_path: Optional[str] = None
 
     def _on_button(self) -> None:
         if self._done:
@@ -194,19 +204,31 @@ class CopyProgressDialog(QDialog):
         self._done = True
         self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(1)
-        self.info_label.setText(
+        text = (
             f"完了: {snap['files_copied']} ファイル, "
             f"{snap['bytes_copied'] / (1024 * 1024):.1f} MB, "
             f"{snap['elapsed_sec']:.1f} 秒\n"
             f"スキップ: {snap['files_skipped']} 件, エラー: {snap['error_count']} 件"
         )
+        if snap["error_count"] > 0:
+            self.log_path = write_error_log(snap["errors"])
+            self.open_log_button.setVisible(True)
+            text += f"\nエラー詳細: {self.log_path}"
+        self.info_label.setText(text)
         self.close_button.setText("閉じる")
         self.close_button.setEnabled(True)
 
     def show_failed(self, message: str) -> None:
         self._done = True
-        self.info_label.setText(f"エラーが発生しました:\n{message}")
+        self.log_path = write_error_log([], fatal=message)
+        self.open_log_button.setVisible(True)
+        first_line = message.strip().splitlines()[-1] if message.strip() else message
+        self.info_label.setText(f"エラーが発生しました:\n{first_line}\n\n詳細: {self.log_path}")
         self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(0)
         self.close_button.setText("閉じる")
         self.close_button.setEnabled(True)
+
+    def _on_open_log(self) -> None:
+        if self.log_path:
+            os.startfile(self.log_path)
