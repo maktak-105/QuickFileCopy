@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtCore import QObject
 
-from fastestcopy.engine.copier import run_copy
+from fastestcopy.engine.copier import run_copy, run_copy_multi
 from fastestcopy.engine.policy import ConflictAction, ConflictPolicy
 
 
@@ -73,8 +73,8 @@ class CopyWorker(QThread):
 
     def __init__(
         self,
-        src: str,
-        dst: str,
+        items: list[tuple[str, str]],
+        merge: bool,
         policy: ConflictPolicy,
         ask_callback=None,
         small_workers: Optional[int] = None,
@@ -83,9 +83,14 @@ class CopyWorker(QThread):
         preallocate_large: bool = True,
         parent=None,
     ):
+        """items: [(src, dst), ...] to copy. When merge is True, items must
+        be a single pair and src's *contents* merge into dst (the classic
+        one-folder-into-another mode); otherwise each item is copied
+        keeping its own name at its own dst (a multi-selection paste).
+        """
         super().__init__(parent)
-        self.src = src
-        self.dst = dst
+        self.items = items
+        self.merge = merge
         self.policy = policy
         self.ask_callback = ask_callback
         self.small_workers = small_workers
@@ -99,9 +104,7 @@ class CopyWorker(QThread):
 
     def run(self) -> None:
         try:
-            stats = run_copy(
-                self.src,
-                self.dst,
+            kwargs = dict(
                 policy=self.policy,
                 ask_callback=self.ask_callback,
                 small_workers=self.small_workers,
@@ -111,6 +114,11 @@ class CopyWorker(QThread):
                 progress_cb=lambda snap: self.progress.emit(snap),
                 stop_event=self.stop_event,
             )
+            if self.merge:
+                src, dst = self.items[0]
+                stats = run_copy(src, dst, **kwargs)
+            else:
+                stats = run_copy_multi(self.items, **kwargs)
             self.finished_ok.emit(stats.snapshot())
         except Exception as e:  # noqa: BLE001
             self.failed.emit(str(e))

@@ -4,6 +4,7 @@ import os
 
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QLabel,
     QMainWindow,
@@ -48,6 +49,10 @@ class MainWindow(QMainWindow):
         for label in _POLICY_LABELS:
             self.policy_combo.addItem(label)
 
+        self.show_hidden_checkbox = QCheckBox("隠しファイル/フォルダを表示")
+        self.show_hidden_checkbox.setChecked(False)
+        self.show_hidden_checkbox.toggled.connect(self._on_show_hidden_toggled)
+
         self.copy_button = QPushButton("コピー →")
         self.copy_button.setFixedHeight(40)
         self.copy_button.clicked.connect(self._on_copy_clicked)
@@ -65,6 +70,7 @@ class MainWindow(QMainWindow):
         center_layout.addStretch()
         center_layout.addWidget(QLabel("競合ポリシー:"))
         center_layout.addWidget(self.policy_combo)
+        center_layout.addWidget(self.show_hidden_checkbox)
         center_layout.addWidget(self.copy_button)
         center_layout.addWidget(self.privilege_label)
         center_layout.addStretch()
@@ -95,6 +101,10 @@ class MainWindow(QMainWindow):
             elevate_action.triggered.connect(self._on_elevate)
             tools_menu.addAction(elevate_action)
 
+    def _on_show_hidden_toggled(self, checked: bool) -> None:
+        self.source_pane.set_show_hidden(checked)
+        self.target_pane.set_show_hidden(checked)
+
     def _open_settings(self) -> None:
         dlg = SettingsDialog(self.settings, self)
         if dlg.exec():
@@ -115,32 +125,58 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "エラー", "管理者としての再起動に失敗しました。")
 
-    def _on_copy_clicked(self) -> None:
-        src = self.source_pane.selected_path()
-        dst = self.target_pane.selected_path()
+    def _validate_copy_pair(self, src: str, dst_abs: str) -> bool:
+        """False (with an error dialog) if src can't be copied into the
+        folder dst_abs resolves to: same folder, or dst nested inside src.
+        """
+        src_abs = os.path.normcase(os.path.abspath(src))
+        if src_abs == dst_abs:
+            QMessageBox.warning(self, "エラー", "コピー元とコピー先が同じフォルダです。")
+            return False
+        if dst_abs.startswith(src_abs + os.sep):
+            QMessageBox.warning(self, "エラー", "コピー先がコピー元の内部にあります。")
+            return False
+        return True
 
-        if not src or not os.path.isdir(src):
-            QMessageBox.warning(self, "エラー", "コピー元フォルダを選択してください。")
-            return
+    def _on_copy_clicked(self) -> None:
+        dst = self.target_pane.selected_path()
         if not dst or not os.path.isdir(dst):
             QMessageBox.warning(self, "エラー", "コピー先フォルダを選択してください。")
             return
-        src_abs = os.path.normcase(os.path.abspath(src))
         dst_abs = os.path.normcase(os.path.abspath(dst))
-        if src_abs == dst_abs:
-            QMessageBox.warning(self, "エラー", "コピー元とコピー先が同じフォルダです。")
-            return
-        if dst_abs.startswith(src_abs + os.sep):
-            QMessageBox.warning(self, "エラー", "コピー先がコピー元の内部にあります。")
-            return
+
+        rows = self.source_pane.selected_rows()
+        # A multi-selection, or a single selected *file*, has no one root
+        # whose contents can merge into dst - each item keeps its own name
+        # there instead (Explorer-style paste). A single selected folder
+        # (or nothing selected, falling back to the pane's current folder)
+        # keeps the original merge-its-contents-into-dst behavior.
+        multi = len(rows) >= 2 or (len(rows) == 1 and not os.path.isdir(rows[0]))
+
+        if multi:
+            items = []
+            for src in rows:
+                if not self._validate_copy_pair(src, dst_abs):
+                    return
+                items.append((src, os.path.join(dst, os.path.basename(src.rstrip("\\/")))))
+            merge = False
+        else:
+            src = rows[0] if rows else self.source_pane.selected_path()
+            if not src or not os.path.isdir(src):
+                QMessageBox.warning(self, "エラー", "コピー元フォルダを選択してください。")
+                return
+            if not self._validate_copy_pair(src, dst_abs):
+                return
+            items = [(src, dst)]
+            merge = True
 
         policy = _POLICY_LABELS[self.policy_combo.currentText()]
         ask_cb = self.conflict_asker.ask if policy is ConflictPolicy.ASK else None
 
         dialog = CopyProgressDialog(self)
         worker = CopyWorker(
-            src,
-            dst,
+            items,
+            merge,
             policy,
             ask_callback=ask_cb,
             small_workers=self.settings.small_workers,

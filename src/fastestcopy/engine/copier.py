@@ -10,7 +10,7 @@ from typing import Callable, Optional
 
 from . import planner, winio
 from .policy import AskCallback, ConflictAction, ConflictPolicy, resolve_conflict
-from .scanner import CopyJob, scan_and_enqueue
+from .scanner import CopyJob, scan_and_enqueue, scan_items_and_enqueue
 from .stats import CopyStats
 
 ProgressCallback = Callable[[dict], None]
@@ -71,22 +71,27 @@ def _copy_large_job(
         stats.add_error(job.src, e)
 
 
-def run_copy(
-    src_root: str,
-    dst_root: str,
+def _run_copy_pipeline(
+    scanner_target,
+    scanner_args: tuple,
     *,
-    policy: ConflictPolicy = ConflictPolicy.SKIP,
-    ask_callback: Optional[AskCallback] = None,
-    small_threshold: int = planner.SMALL_FILE_THRESHOLD,
-    small_workers: Optional[int] = None,
-    large_file_concurrency: Optional[int] = None,
-    large_chunk_workers: Optional[int] = None,
-    buffer_size: int = winio.DEFAULT_BUFFER_SIZE,
-    preallocate_large: bool = True,
-    progress_cb: Optional[ProgressCallback] = None,
-    progress_interval: float = 0.2,
-    stop_event: Optional[threading.Event] = None,
+    policy: ConflictPolicy,
+    ask_callback: Optional[AskCallback],
+    small_threshold: int,
+    small_workers: Optional[int],
+    large_file_concurrency: Optional[int],
+    large_chunk_workers: Optional[int],
+    buffer_size: int,
+    preallocate_large: bool,
+    progress_cb: Optional[ProgressCallback],
+    progress_interval: float,
+    stop_event: Optional[threading.Event],
 ) -> CopyStats:
+    """Shared queue/worker-pool orchestration behind both run_copy (one
+    src_root -> dst_root merge) and run_copy_multi (several independently-
+    named items into one destination) - they differ only in which scanner
+    function populates the job queue.
+    """
     stats = CopyStats()
     stop_event = stop_event or threading.Event()
     small_workers = small_workers or planner.suggest_small_workers()
@@ -97,8 +102,8 @@ def run_copy(
     scan_done = threading.Event()
 
     scanner_thread = threading.Thread(
-        target=scan_and_enqueue,
-        args=(src_root, dst_root, job_queue, stats, stop_event, scan_done),
+        target=scanner_target,
+        args=scanner_args + (job_queue, stats, stop_event, scan_done),
         daemon=True,
         name="fc-scanner",
     )
@@ -163,3 +168,76 @@ def run_copy(
     if progress_cb is not None:
         progress_cb(stats.snapshot())
     return stats
+
+
+def run_copy(
+    src_root: str,
+    dst_root: str,
+    *,
+    policy: ConflictPolicy = ConflictPolicy.SKIP,
+    ask_callback: Optional[AskCallback] = None,
+    small_threshold: int = planner.SMALL_FILE_THRESHOLD,
+    small_workers: Optional[int] = None,
+    large_file_concurrency: Optional[int] = None,
+    large_chunk_workers: Optional[int] = None,
+    buffer_size: int = winio.DEFAULT_BUFFER_SIZE,
+    preallocate_large: bool = True,
+    progress_cb: Optional[ProgressCallback] = None,
+    progress_interval: float = 0.2,
+    stop_event: Optional[threading.Event] = None,
+) -> CopyStats:
+    """Copies src_root's contents into dst_root (both directories), merging
+    by relative path - the classic single-source-tree mode.
+    """
+    return _run_copy_pipeline(
+        scan_and_enqueue,
+        (src_root, dst_root),
+        policy=policy,
+        ask_callback=ask_callback,
+        small_threshold=small_threshold,
+        small_workers=small_workers,
+        large_file_concurrency=large_file_concurrency,
+        large_chunk_workers=large_chunk_workers,
+        buffer_size=buffer_size,
+        preallocate_large=preallocate_large,
+        progress_cb=progress_cb,
+        progress_interval=progress_interval,
+        stop_event=stop_event,
+    )
+
+
+def run_copy_multi(
+    items: list[tuple[str, str]],
+    *,
+    policy: ConflictPolicy = ConflictPolicy.SKIP,
+    ask_callback: Optional[AskCallback] = None,
+    small_threshold: int = planner.SMALL_FILE_THRESHOLD,
+    small_workers: Optional[int] = None,
+    large_file_concurrency: Optional[int] = None,
+    large_chunk_workers: Optional[int] = None,
+    buffer_size: int = winio.DEFAULT_BUFFER_SIZE,
+    preallocate_large: bool = True,
+    progress_cb: Optional[ProgressCallback] = None,
+    progress_interval: float = 0.2,
+    stop_event: Optional[threading.Event] = None,
+) -> CopyStats:
+    """Copies several independently-named items - a multi-selection, each
+    a file or a whole directory tree - each keeping its own name at its
+    paired destination path (Explorer-style paste), rather than merging
+    everything under one shared root like run_copy does.
+    """
+    return _run_copy_pipeline(
+        scan_items_and_enqueue,
+        (items,),
+        policy=policy,
+        ask_callback=ask_callback,
+        small_threshold=small_threshold,
+        small_workers=small_workers,
+        large_file_concurrency=large_file_concurrency,
+        large_chunk_workers=large_chunk_workers,
+        buffer_size=buffer_size,
+        preallocate_large=preallocate_large,
+        progress_cb=progress_cb,
+        progress_interval=progress_interval,
+        stop_event=stop_event,
+    )

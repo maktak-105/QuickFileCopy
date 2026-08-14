@@ -22,9 +22,11 @@ QFileSystemModel where a real filesystem view is needed (the content pane).
 from __future__ import annotations
 
 import os
+import stat
 
-from PySide6.QtCore import Qt, QFileInfo, Signal
+from PySide6.QtCore import Qt, QDir, QFileInfo, Signal
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QFileIconProvider,
     QFileSystemModel,
     QHBoxLayout,
@@ -60,6 +62,8 @@ class FilePane(QWidget):
         self.model = QFileSystemModel(self)
         self.model.setRootPath("")
         self._icon_provider = QFileIconProvider()
+        self.show_hidden = False
+        self._apply_content_filter()
 
         self.computer_button = QPushButton("PC")
         self.computer_button.setFixedWidth(36)
@@ -83,6 +87,10 @@ class FilePane(QWidget):
         self.content_tree.setModel(self.model)
         self.content_tree.setSortingEnabled(True)
         self.content_tree.sortByColumn(0, Qt.AscendingOrder)
+        # Explorer-style multi-select: plain click selects one row, Ctrl+click
+        # toggles individual rows in/out, Shift+click selects a range.
+        self.content_tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.content_tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.content_tree.doubleClicked.connect(self._on_double_click)
 
         splitter = QSplitter()
@@ -188,14 +196,25 @@ class FilePane(QWidget):
             return
         for entry in entries:
             try:
-                if entry.is_dir(follow_symlinks=False):
-                    child = QTreeWidgetItem([entry.name])
-                    child.setData(0, PATH_ROLE, entry.path)
-                    child.setIcon(0, self._icon_provider.icon(QFileInfo(entry.path)))
-                    self._add_dummy_child(child)
-                    item.addChild(child)
+                if not entry.is_dir(follow_symlinks=False):
+                    continue
+                if not self.show_hidden and self._is_hidden(entry):
+                    continue
+                child = QTreeWidgetItem([entry.name])
+                child.setData(0, PATH_ROLE, entry.path)
+                child.setIcon(0, self._icon_provider.icon(QFileInfo(entry.path)))
+                self._add_dummy_child(child)
+                item.addChild(child)
             except OSError:
                 continue
+
+    @staticmethod
+    def _is_hidden(entry: os.DirEntry) -> bool:
+        try:
+            attrs = entry.stat(follow_symlinks=False).st_file_attributes
+        except OSError:
+            return False
+        return bool(attrs & stat.FILE_ATTRIBUTE_HIDDEN)
 
     def _on_nav_item_clicked(self, item: QTreeWidgetItem, _column: int) -> None:
         path = item.data(0, PATH_ROLE)
@@ -298,6 +317,37 @@ class FilePane(QWidget):
             if os.path.isdir(p):
                 return p
         return self.current_path
+
+    def selected_rows(self) -> list[str]:
+        """Every row explicitly selected in the content pane (files and
+        folders alike, in whatever order Qt reports them) - empty if
+        nothing is explicitly selected, i.e. the caller is just browsing
+        the current folder as a whole.
+        """
+        selection_model = self.content_tree.selectionModel()
+        if selection_model is None:
+            return []
+        return [self.model.filePath(idx) for idx in selection_model.selectedRows()]
+
+    def set_show_hidden(self, show: bool) -> None:
+        """Toggle whether hidden files/folders (the Windows Hidden
+        attribute, not Unix-style dotfiles) are shown, in both the content
+        pane and the nav tree. Rebuilds the nav tree from its roots since
+        already-populated folder items cached their children under the old
+        setting.
+        """
+        if show == self.show_hidden:
+            return
+        self.show_hidden = show
+        self._apply_content_filter()
+        self._pc_item, self._network_item = self._build_nav_root()
+        self.refresh()
+
+    def _apply_content_filter(self) -> None:
+        base = QDir.Filter.AllEntries | QDir.Filter.NoDotAndDotDot | QDir.Filter.AllDirs
+        if self.show_hidden:
+            base |= QDir.Filter.Hidden
+        self.model.setFilter(base)
 
     def refresh(self) -> None:
         if self.current_path == COMPUTER:

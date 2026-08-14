@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from fastestcopy.engine.copier import run_copy
+from fastestcopy.engine.copier import run_copy, run_copy_multi
 from fastestcopy.engine.policy import ConflictPolicy
 
 
@@ -199,6 +199,56 @@ def test_timestamps_preserved(tmp_path):
     src_mtime = os.stat(src / "a.txt").st_mtime
     dst_mtime = os.stat(dst / "a.txt").st_mtime
     assert abs(src_mtime - dst_mtime) < 1.0
+
+
+def test_run_copy_multi_keeps_each_item_own_name(tmp_path):
+    """Multi-select paste: unlike run_copy (which merges src's contents
+    into dst), each selected item - file or folder - keeps its own name
+    at the destination.
+    """
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    src.mkdir()
+    dst.mkdir()
+    _make_tree(
+        src,
+        {
+            "lonefile.txt": b"solo",
+            "folder/a.txt": b"hello",
+            "folder/sub/b.txt": b"world",
+        },
+    )
+
+    items = [
+        (str(src / "lonefile.txt"), str(dst / "lonefile.txt")),
+        (str(src / "folder"), str(dst / "folder")),
+    ]
+    stats = run_copy_multi(items, policy=ConflictPolicy.SKIP)
+    snap = stats.snapshot()
+
+    assert snap["error_count"] == 0
+    assert snap["files_copied"] == 3
+    assert (dst / "lonefile.txt").read_bytes() == b"solo"
+    assert (dst / "folder" / "a.txt").read_bytes() == b"hello"
+    assert (dst / "folder" / "sub" / "b.txt").read_bytes() == b"world"
+
+
+def test_run_copy_multi_respects_conflict_policy(tmp_path):
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    src.mkdir()
+    dst.mkdir()
+    (src / "a.txt").write_bytes(b"new")
+    (dst / "a.txt").write_bytes(b"existing")
+
+    stats = run_copy_multi(
+        [(str(src / "a.txt"), str(dst / "a.txt"))], policy=ConflictPolicy.SKIP
+    )
+    snap = stats.snapshot()
+
+    assert snap["files_copied"] == 0
+    assert snap["files_skipped"] == 1
+    assert (dst / "a.txt").read_bytes() == b"existing"
 
 
 def test_empty_source_tree_produces_no_errors(tmp_path):
