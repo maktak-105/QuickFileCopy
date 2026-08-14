@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QActionGroup
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -30,15 +30,23 @@ from .copy_dialog import (
     format_eta,
     format_preview_summary,
 )
-from .elevate import is_admin, relaunch_as_admin
+from .elevate import is_admin, relaunch_as_admin, relaunch_normal
 from .file_pane import FilePane
+from .help_dialog import HelpDialog
+from .i18n import get_language, set_language, tr
 from .settings_dialog import CopySettings, SettingsDialog
 
-_POLICY_LABELS = {
-    "スキップ (既存を保持)": ConflictPolicy.SKIP,
-    "上書き": ConflictPolicy.OVERWRITE,
-    "新しい方のみ上書き": ConflictPolicy.OVERWRITE_IF_NEWER,
-    "毎回確認": ConflictPolicy.ASK,
+_POLICY_ORDER = [
+    ConflictPolicy.SKIP,
+    ConflictPolicy.OVERWRITE,
+    ConflictPolicy.OVERWRITE_IF_NEWER,
+    ConflictPolicy.ASK,
+]
+_POLICY_KEYS = {
+    ConflictPolicy.SKIP: "policy_skip",
+    ConflictPolicy.OVERWRITE: "policy_overwrite",
+    ConflictPolicy.OVERWRITE_IF_NEWER: "policy_overwrite_if_newer",
+    ConflictPolicy.ASK: "policy_ask",
 }
 
 
@@ -63,7 +71,7 @@ def _dest_name_for(src: str) -> str:
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("FastestCopy" + (" (管理者)" if is_admin() else ""))
+        self.setWindowTitle("FastestCopy" + (tr("admin_suffix") if is_admin() else ""))
         self.resize(950, 900)
 
         self.settings = CopySettings()
@@ -72,25 +80,23 @@ class MainWindow(QMainWindow):
 
         # Start on the drive-list ("This PC") view rather than drilling into
         # the user folder, so the nav tree opens uncommitted to any drive.
-        self.source_pane = FilePane(None, "ソース")
-        self.target_pane = FilePane(None, "ターゲット")
+        self.source_pane = FilePane(None, "source")
+        self.target_pane = FilePane(None, "target")
 
         self.policy_combo = QComboBox()
-        for label in _POLICY_LABELS:
-            self.policy_combo.addItem(label)
+        for policy in _POLICY_ORDER:
+            self.policy_combo.addItem(tr(_POLICY_KEYS[policy]), policy)
 
-        self.show_hidden_checkbox = QCheckBox("隠しファイル/フォルダを表示")
+        self.show_hidden_checkbox = QCheckBox(tr("show_hidden_checkbox"))
         self.show_hidden_checkbox.setChecked(False)
         self.show_hidden_checkbox.toggled.connect(self._on_show_hidden_toggled)
 
-        self.copy_button = QPushButton("コピー →")
+        self.copy_button = QPushButton(tr("copy_button"))
         self.copy_button.setFixedHeight(40)
         self.copy_button.clicked.connect(self._on_copy_clicked)
 
-        self.scan_copy_button = QPushButton("スキャンしてコピー →")
-        self.scan_copy_button.setToolTip(
-            "先に対象全体をスキャンしてコピー件数を確認し、確認後にコピーを開始します。"
-        )
+        self.scan_copy_button = QPushButton(tr("scan_copy_button"))
+        self.scan_copy_button.setToolTip(tr("scan_copy_button_tooltip"))
         self.scan_copy_button.clicked.connect(self._on_scan_copy_clicked)
 
         self.progress_bar = QProgressBar()
@@ -98,18 +104,14 @@ class MainWindow(QMainWindow):
         self.progress_label = QLabel("")
         self.progress_label.setWordWrap(True)
 
-        self.privilege_label = QLabel(
-            "管理者権限: あり\n(巨大ファイル高速化 有効)"
-            if is_admin()
-            else "管理者権限: なし\n(ツールメニューから昇格可能)"
-        )
+        self.privilege_label = QLabel(tr("privilege_admin") if is_admin() else tr("privilege_not_admin"))
         self.privilege_label.setWordWrap(True)
 
         center = QWidget()
         center.setFixedWidth(220)
         center_layout = QVBoxLayout(center)
         center_layout.addStretch()
-        center_layout.addWidget(QLabel("競合ポリシー:"))
+        center_layout.addWidget(QLabel(tr("policy_group_label")))
         center_layout.addWidget(self.policy_combo)
         center_layout.addWidget(self.show_hidden_checkbox)
         center_layout.addWidget(self.copy_button)
@@ -124,9 +126,9 @@ class MainWindow(QMainWindow):
         # the window stays roughly square instead of sprawling wide with
         # three side-by-side columns. Labeled and separated by a down
         # arrow so the top-to-bottom copy direction reads at a glance.
-        source_label = QLabel("コピー元")
+        source_label = QLabel(tr("pane_source_label"))
         source_label.setStyleSheet("font-weight: bold; font-size: 13px;")
-        target_label = QLabel("コピー先")
+        target_label = QLabel(tr("pane_target_label"))
         target_label.setStyleSheet("font-weight: bold; font-size: 13px;")
 
         arrow_label = QLabel("▼")
@@ -151,21 +153,57 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(main_splitter)
         self.setStatusBar(QStatusBar())
-        self.statusBar().showMessage("準備完了")
+        self.statusBar().showMessage(tr("status_ready"))
 
         self._build_menu()
 
     def _build_menu(self) -> None:
-        tools_menu = self.menuBar().addMenu("ツール")
+        tools_menu = self.menuBar().addMenu(tr("menu_tools"))
 
-        settings_action = QAction("設定...", self)
+        settings_action = QAction(tr("menu_settings"), self)
         settings_action.triggered.connect(self._open_settings)
         tools_menu.addAction(settings_action)
 
         if not is_admin():
-            elevate_action = QAction("管理者として再起動...", self)
+            elevate_action = QAction(tr("menu_elevate"), self)
             elevate_action.triggered.connect(self._on_elevate)
             tools_menu.addAction(elevate_action)
+
+        language_menu = tools_menu.addMenu(tr("menu_language"))
+        lang_group = QActionGroup(self)
+        lang_group.setExclusive(True)
+        current = get_language()
+        for lang_code, key in (("ja", "menu_lang_ja"), ("en", "menu_lang_en")):
+            action = QAction(tr(key), self, checkable=True)
+            action.setChecked(lang_code == current)
+            action.triggered.connect(lambda _checked, code=lang_code: self._on_language_selected(code))
+            lang_group.addAction(action)
+            language_menu.addAction(action)
+
+        help_menu = self.menuBar().addMenu(tr("menu_help"))
+        help_action = QAction(tr("menu_help_show"), self)
+        help_action.triggered.connect(self._on_show_help)
+        help_menu.addAction(help_action)
+
+    def _on_show_help(self) -> None:
+        HelpDialog(self).exec()
+
+    def _on_language_selected(self, lang: str) -> None:
+        if lang == get_language():
+            return
+        set_language(lang)
+        reply = QMessageBox.question(
+            self,
+            tr("restart_now_title"),
+            tr("restart_now_body"),
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        if relaunch_normal():
+            self.close()
+        else:
+            QMessageBox.warning(self, tr("error_title"), tr("restart_failed"))
 
     def _on_show_hidden_toggled(self, checked: bool) -> None:
         self.source_pane.set_show_hidden(checked)
@@ -179,9 +217,8 @@ class MainWindow(QMainWindow):
     def _on_elevate(self) -> None:
         reply = QMessageBox.question(
             self,
-            "管理者として再起動",
-            "巨大ファイルの事前領域確保による高速化には管理者権限が必要です。\n"
-            "アプリを管理者として再起動しますか?(UACの確認が表示されます)",
+            tr("elevate_confirm_title"),
+            tr("elevate_confirm_body"),
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
@@ -189,7 +226,7 @@ class MainWindow(QMainWindow):
         if relaunch_as_admin():
             self.close()
         else:
-            QMessageBox.warning(self, "エラー", "管理者としての再起動に失敗しました。")
+            QMessageBox.warning(self, tr("error_title"), tr("elevate_failed"))
 
     def _validate_copy_pair(self, src: str, dst_abs: str) -> bool:
         """False (with an error dialog) if src can't be copied into the
@@ -197,7 +234,7 @@ class MainWindow(QMainWindow):
         """
         src_abs = os.path.normcase(os.path.abspath(src))
         if src_abs == dst_abs:
-            QMessageBox.warning(self, "エラー", "コピー元とコピー先が同じフォルダです。")
+            QMessageBox.warning(self, tr("error_title"), tr("error_same_folder"))
             return False
         # A drive/UNC share root's abspath already ends in a separator
         # (e.g. "c:\\"), so appending another os.sep below would double it
@@ -205,7 +242,7 @@ class MainWindow(QMainWindow):
         # first so the prefix always ends in exactly one.
         src_prefix = src_abs.rstrip(os.sep) + os.sep
         if dst_abs.startswith(src_prefix):
-            QMessageBox.warning(self, "エラー", "コピー先がコピー元の内部にあります。")
+            QMessageBox.warning(self, tr("error_title"), tr("error_dst_inside_src"))
             return False
         return True
 
@@ -217,7 +254,7 @@ class MainWindow(QMainWindow):
         """
         dst = self.target_pane.selected_path()
         if not dst or not os.path.isdir(dst):
-            QMessageBox.warning(self, "エラー", "コピー先フォルダを選択してください。")
+            QMessageBox.warning(self, tr("error_title"), tr("error_pick_dest_folder"))
             return None
         dst_abs = os.path.normcase(os.path.abspath(dst))
 
@@ -226,7 +263,7 @@ class MainWindow(QMainWindow):
         # pane is showing/has selected as a single-item source.
         sources = rows if rows else [self.source_pane.selected_path()]
         if not sources[0] or not os.path.exists(sources[0]):
-            QMessageBox.warning(self, "エラー", "コピー元を選択してください。")
+            QMessageBox.warning(self, tr("error_title"), tr("error_pick_source"))
             return None
 
         # Every item - file or folder - keeps its own name at dst, same as
@@ -240,7 +277,7 @@ class MainWindow(QMainWindow):
         return items
 
     def _current_policy(self) -> ConflictPolicy:
-        return _POLICY_LABELS[self.policy_combo.currentText()]
+        return self.policy_combo.currentData()
 
     def _on_copy_clicked(self) -> None:
         items = self._build_copy_items()
@@ -291,7 +328,7 @@ class MainWindow(QMainWindow):
         scan_worker.wait()
 
         if "error" in outcome:
-            QMessageBox.warning(self, "エラー", f"スキャン中にエラーが発生しました:\n{outcome['error']}")
+            QMessageBox.warning(self, tr("error_title"), tr("scan_error").format(error=outcome["error"]))
             return
 
         result = outcome.get("result")
@@ -302,14 +339,13 @@ class MainWindow(QMainWindow):
         if not jobs:
             QMessageBox.information(
                 self,
-                "スキャン完了",
-                f"合計 {result.total_files} 件を確認しましたが、"
-                "すべて既に最新のためコピーは不要です。",
+                tr("scan_done_title"),
+                tr("scan_nothing_to_copy").format(total=result.total_files),
             )
             return
 
         reply = QMessageBox.question(
-            self, "コピーの確認", format_preview_summary(result), QMessageBox.Yes | QMessageBox.No
+            self, tr("copy_confirm_title"), format_preview_summary(result), QMessageBox.Yes | QMessageBox.No
         )
         if reply != QMessageBox.Yes:
             return
@@ -345,16 +381,17 @@ class MainWindow(QMainWindow):
         self.target_pane.refresh()
 
     def _update_center_progress(self, snap: dict) -> None:
-        lines = [f"{snap['files_copied']} ファイル / {snap['bytes_copied'] / (1024 * 1024):.1f} MB"]
+        mb = f"{snap['bytes_copied'] / (1024 * 1024):.1f}"
+        lines = [tr("center_progress_line").format(files=snap["files_copied"], mb=mb)]
         if snap["progress_pct"] is not None:
             self.progress_bar.setRange(0, 1000)
             self.progress_bar.setValue(int(snap["progress_pct"] * 10))
-            lines.append(f"進捗: {snap['progress_pct']:.1f}%")
+            lines.append(tr("center_progress_pct").format(pct=f"{snap['progress_pct']:.1f}"))
             if snap["eta_sec"] is not None:
-                lines.append(f"残り約 {format_eta(snap['eta_sec'])}")
+                lines.append(tr("center_progress_eta").format(eta=format_eta(snap["eta_sec"])))
         else:
             self.progress_bar.setRange(0, 0)  # still scanning: total size not known yet
-            lines.append("スキャン中...")
+            lines.append(tr("center_progress_scanning"))
         self.progress_label.setText("\n".join(lines))
 
     def _clear_center_progress(self, *_args) -> None:
@@ -364,9 +401,8 @@ class MainWindow(QMainWindow):
     def _on_copy_done(self, dialog: CopyProgressDialog, snap: dict) -> None:
         dialog.show_done(snap)
         self._clear_center_progress()
+        mb = f"{snap['bytes_copied'] / (1024 * 1024):.1f}"
+        sec = f"{snap['elapsed_sec']:.1f}"
         self.statusBar().showMessage(
-            f"完了: {snap['files_copied']} ファイル, "
-            f"{snap['bytes_copied'] / (1024 * 1024):.1f} MB, "
-            f"{snap['elapsed_sec']:.1f} 秒",
-            10000,
+            tr("status_done").format(files=snap["files_copied"], mb=mb, sec=sec), 10000
         )

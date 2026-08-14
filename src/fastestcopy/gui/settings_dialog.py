@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
 
 from fastestcopy.engine import planner
 
+from .i18n import tr
+
 
 @dataclass
 class CopySettings:
@@ -26,7 +28,7 @@ class CopySettings:
 class SettingsDialog(QDialog):
     def __init__(self, settings: CopySettings, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("設定")
+        self.setWindowTitle(tr("settings_title"))
         self.settings = settings
 
         self.small_workers_spin = QSpinBox()
@@ -44,13 +46,13 @@ class SettingsDialog(QDialog):
         self.buffer_spin.setSuffix(" MB")
         self.buffer_spin.setValue(settings.buffer_mb)
 
-        self.preallocate_check = QCheckBox("巨大ファイルの事前領域確保を試みる(管理者権限が必要)")
+        self.preallocate_check = QCheckBox(tr("settings_preallocate"))
         self.preallocate_check.setChecked(settings.preallocate_large)
 
         form = QFormLayout()
-        form.addRow("小ファイル用スレッド数:", self.small_workers_spin)
-        form.addRow("大ファイル用チャンク並列数:", self.large_chunk_spin)
-        form.addRow("転送バッファサイズ:", self.buffer_spin)
+        form.addRow(tr("settings_small_workers"), self.small_workers_spin)
+        form.addRow(tr("settings_large_chunk"), self.large_chunk_spin)
+        form.addRow(tr("settings_buffer_size"), self.buffer_spin)
         form.addRow(self.preallocate_check)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)

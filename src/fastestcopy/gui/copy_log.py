@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 import time
 
+from .i18n import tr
+
 LOG_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "FastestCopy", "logs")
 
 
@@ -22,13 +24,13 @@ def write_error_log(errors: list[tuple[str, str]], fatal: str | None = None) -> 
     os.makedirs(LOG_DIR, exist_ok=True)
     path = os.path.join(LOG_DIR, time.strftime("copy_errors_%Y%m%d_%H%M%S.log"))
     with open(path, "w", encoding="utf-8") as f:
-        f.write(f"FastestCopy エラーログ - {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(tr("log_header").format(time=time.strftime("%Y-%m-%d %H:%M:%S")) + "\n")
         f.write("=" * 60 + "\n\n")
         if fatal:
-            f.write("致命的エラー:\n")
+            f.write(tr("log_fatal_header") + "\n")
             f.write(fatal.rstrip() + "\n\n")
         if errors:
-            f.write(f"ファイル単位のエラー ({len(errors)} 件):\n")
+            f.write(tr("log_file_errors_header").format(n=len(errors)) + "\n")
             for path_, reason in errors:
                 f.write(f"  {path_}\n    -> {reason}\n")
     return path

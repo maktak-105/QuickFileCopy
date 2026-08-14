@@ -41,6 +41,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import drives, netbrowse
+from .i18n import tr
 
 # Sentinel current_path value meaning "the This PC / drive list view", not a
 # real filesystem path.
@@ -65,15 +66,15 @@ class FilePane(QWidget):
         self.show_hidden = False
         self._apply_content_filter()
 
-        self.computer_button = QPushButton("PC")
+        self.computer_button = QPushButton(tr("pc_button"))
         self.computer_button.setFixedWidth(36)
-        self.computer_button.setToolTip("コンピューター(ドライブ一覧)を表示")
+        self.computer_button.setToolTip(tr("pc_button_tooltip"))
 
-        self.up_button = QPushButton("上へ")
+        self.up_button = QPushButton(tr("up_button"))
         self.up_button.setFixedWidth(50)
 
         self.path_edit = QLineEdit()
-        self.path_edit.setPlaceholderText(r"パスを入力 (\\server\share もOK)")
+        self.path_edit.setPlaceholderText(tr("path_edit_placeholder"))
 
         # Left: persistent nav tree, grouped like Explorer (PC / ネットワーク).
         self.nav_tree = QTreeWidget()
@@ -123,13 +124,13 @@ class FilePane(QWidget):
 
     def _build_nav_root(self) -> tuple[QTreeWidgetItem, QTreeWidgetItem]:
         self.nav_tree.clear()
-        pc_item = QTreeWidgetItem(["PC"])
+        pc_item = QTreeWidgetItem([tr("pc_button")])
         pc_item.setData(0, PATH_ROLE, None)
         pc_item.setIcon(0, self._icon_provider.icon(QFileIconProvider.IconType.Computer))
         self._add_dummy_child(pc_item)
         self.nav_tree.addTopLevelItem(pc_item)
 
-        network_item = QTreeWidgetItem(["ネットワーク"])
+        network_item = QTreeWidgetItem([tr("nav_network")])
         network_item.setData(0, PATH_ROLE, None)
         network_item.setIcon(0, self._icon_provider.icon(QFileIconProvider.IconType.Network))
         self._add_dummy_child(network_item)
@@ -288,7 +289,7 @@ class FilePane(QWidget):
         """Show the drive-list ("This PC") view, one level above any drive root."""
         self.model.setRootPath("")
         self.content_tree.setRootIndex(self.model.index(""))
-        self.path_edit.setText("PC")
+        self.path_edit.setText(tr("pc_button"))
         self.current_path = COMPUTER
         self.up_button.setEnabled(False)
         self.nav_tree.clearSelection()
@@ -365,7 +366,8 @@ class FilePane(QWidget):
 
     def _on_path_entered(self) -> None:
         text = self.path_edit.text().strip()
-        if text.upper() in ("PC", "THIS PC", "コンピューター"):
+        aliases = {"PC", "THIS PC", tr("nav_pc_alias").upper()}
+        if text.upper() in aliases:
             self.show_computer()
         else:
             self.set_path(text)

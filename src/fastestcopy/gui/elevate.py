@@ -31,3 +31,22 @@ def relaunch_as_admin() -> bool:
         return rc > 32  # ShellExecuteW: return values > 32 indicate success
     except Exception:
         return False
+
+
+def relaunch_normal() -> bool:
+    """Launch a fresh, non-elevated copy of this application (no UAC
+    prompt) - used after a settings change (e.g. UI language) that only
+    takes effect on next launch. Caller should close the current window
+    regardless of the return value's outer process having started.
+    """
+    try:
+        if getattr(sys, "frozen", False):
+            exe = sys.executable
+            params = " ".join(f'"{a}"' for a in sys.argv[1:])
+        else:
+            exe = sys.executable
+            params = "-m fastestcopy.gui.app " + " ".join(f'"{a}"' for a in sys.argv[1:])
+        rc = ctypes.windll.shell32.ShellExecuteW(None, "open", exe, params, None, 1)
+        return rc > 32
+    except Exception:
+        return False

@@ -27,18 +27,21 @@ from fastestcopy.engine.preview import PreviewResult, scan_preview
 from fastestcopy.engine.scanner import CopyJob
 
 from .copy_log import write_error_log
+from .i18n import tr
 
 
 def format_eta(seconds: float) -> str:
-    """1時間2分 / 3分45秒 / 12秒 - drops the leading unit(s) that are zero."""
+    """1時間2分 / 3分45秒 / 12秒 (or "1h 2m" / "3m 45s" / "12s" in English) -
+    drops the leading unit(s) that are zero.
+    """
     seconds = max(int(seconds), 0)
     hours, rem = divmod(seconds, 3600)
     minutes, secs = divmod(rem, 60)
     if hours:
-        return f"{hours}時間{minutes}分"
+        return tr("eta_hours_minutes").format(h=hours, m=minutes)
     if minutes:
-        return f"{minutes}分{secs}秒"
-    return f"{secs}秒"
+        return tr("eta_minutes_seconds").format(m=minutes, s=secs)
+    return tr("eta_seconds").format(s=secs)
 
 
 class ConflictAsker(QObject):
@@ -76,9 +79,8 @@ class ConflictAsker(QObject):
     def _handle_ask(self, src_path: str, dst_path: str) -> None:
         reply = QMessageBox.question(
             self._parent_widget,
-            "ファイルが既に存在します",
-            f"コピー先に同名ファイルが存在します。上書きしますか?\n\n"
-            f"元: {src_path}\n先: {dst_path}",
+            tr("conflict_title"),
+            tr("conflict_body").format(src=src_path, dst=dst_path),
             QMessageBox.Yes | QMessageBox.No,
         )
         self._result = ConflictAction.COPY if reply == QMessageBox.Yes else ConflictAction.SKIP
@@ -147,21 +149,21 @@ class CopyProgressDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("コピー中...")
+        self.setWindowTitle(tr("copying_title"))
         self.setModal(True)
         self.resize(440, 150)
 
-        self.info_label = QLabel("スキャン中...")
+        self.info_label = QLabel(tr("scanning_title"))
         self.info_label.setWordWrap(True)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 0)  # indeterminate: total size unknown until scan completes
 
-        self.open_log_button = QPushButton("エラーログを開く")
+        self.open_log_button = QPushButton(tr("open_log_button"))
         self.open_log_button.setVisible(False)
         self.open_log_button.clicked.connect(self._on_open_log)
 
-        self.close_button = QPushButton("キャンセル")
+        self.close_button = QPushButton(tr("cancel_button"))
         self.close_button.clicked.connect(self._on_button)
 
         btn_row = QHBoxLayout()
@@ -183,21 +185,26 @@ class CopyProgressDialog(QDialog):
         else:
             self.cancel_requested.emit()
             self.close_button.setEnabled(False)
-            self.info_label.setText("キャンセル中...")
+            self.info_label.setText(tr("cancelling"))
 
     @Slot(dict)
     def update_progress(self, snap: dict) -> None:
+        mb = f"{snap['bytes_copied'] / (1024 * 1024):.1f}"
         lines = [
-            f"{snap['files_copied']} ファイル / {snap['bytes_copied'] / (1024 * 1024):.1f} MB コピー済み",
-            f"{snap['mb_per_sec']:.1f} MB/s, {snap['files_per_sec']:.0f} files/s",
-            f"スキップ: {snap['files_skipped']} 件, エラー: {snap['error_count']} 件",
+            tr("copy_progress_copied").format(files=snap["files_copied"], mb=mb),
+            tr("copy_progress_speed").format(
+                mbps=f"{snap['mb_per_sec']:.1f}", fps=f"{snap['files_per_sec']:.0f}"
+            ),
+            tr("copy_progress_skip_err").format(
+                skipped=snap["files_skipped"], errors=snap["error_count"]
+            ),
         ]
         if snap["progress_pct"] is not None:
             self.progress_bar.setRange(0, 1000)
             self.progress_bar.setValue(int(snap["progress_pct"] * 10))
-            lines.append(f"進捗: {snap['progress_pct']:.1f}%")
+            lines.append(tr("copy_progress_pct").format(pct=f"{snap['progress_pct']:.1f}"))
             if snap["eta_sec"] is not None:
-                lines.append(f"残り時間(予測): {format_eta(snap['eta_sec'])}")
+                lines.append(tr("copy_progress_eta").format(eta=format_eta(snap["eta_sec"])))
         else:
             self.progress_bar.setRange(0, 0)  # still scanning: total size not known yet
         self.info_label.setText("\n".join(lines))
@@ -206,18 +213,18 @@ class CopyProgressDialog(QDialog):
         self._done = True
         self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(1)
-        text = (
-            f"完了: {snap['files_copied']} ファイル, "
-            f"{snap['bytes_copied'] / (1024 * 1024):.1f} MB, "
-            f"{snap['elapsed_sec']:.1f} 秒\n"
-            f"スキップ: {snap['files_skipped']} 件, エラー: {snap['error_count']} 件"
+        mb = f"{snap['bytes_copied'] / (1024 * 1024):.1f}"
+        sec = f"{snap['elapsed_sec']:.1f}"
+        text = tr("copy_done_summary").format(files=snap["files_copied"], mb=mb, sec=sec)
+        text += "\n" + tr("copy_progress_skip_err").format(
+            skipped=snap["files_skipped"], errors=snap["error_count"]
         )
         if snap["error_count"] > 0:
             self.log_path = write_error_log(snap["errors"])
             self.open_log_button.setVisible(True)
-            text += f"\nエラー詳細: {self.log_path}"
+            text += "\n" + tr("error_log_line").format(path=self.log_path)
         self.info_label.setText(text)
-        self.close_button.setText("閉じる")
+        self.close_button.setText(tr("close_button"))
         self.close_button.setEnabled(True)
 
     def show_failed(self, message: str) -> None:
@@ -225,10 +232,12 @@ class CopyProgressDialog(QDialog):
         self.log_path = write_error_log([], fatal=message)
         self.open_log_button.setVisible(True)
         first_line = message.strip().splitlines()[-1] if message.strip() else message
-        self.info_label.setText(f"エラーが発生しました:\n{first_line}\n\n詳細: {self.log_path}")
+        self.info_label.setText(
+            tr("copy_failed_summary").format(message=first_line, path=self.log_path)
+        )
         self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(0)
-        self.close_button.setText("閉じる")
+        self.close_button.setText(tr("close_button"))
         self.close_button.setEnabled(True)
 
     def _on_open_log(self) -> None:
@@ -273,17 +282,17 @@ class ScanProgressDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("スキャン中...")
+        self.setWindowTitle(tr("scanning_title"))
         self.setModal(True)
         self.resize(360, 120)
 
-        self.info_label = QLabel("コピー対象を確認しています...")
+        self.info_label = QLabel(tr("scanning_label"))
         self.info_label.setWordWrap(True)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 0)
 
-        self.close_button = QPushButton("キャンセル")
+        self.close_button = QPushButton(tr("cancel_button"))
         self.close_button.clicked.connect(self._on_cancel)
 
         btn_row = QHBoxLayout()
@@ -298,22 +307,23 @@ class ScanProgressDialog(QDialog):
     def _on_cancel(self) -> None:
         self.cancel_requested.emit()
         self.close_button.setEnabled(False)
-        self.info_label.setText("キャンセル中...")
+        self.info_label.setText(tr("cancelling"))
 
 
 def format_preview_summary(result: PreviewResult) -> str:
     """Confirmation text shown before an actually-scanned copy starts:
     how many of the total were already up to date vs. need copying.
     """
+    mb = f"{result.copy_bytes / (1024 * 1024):.1f}"
     lines = [
-        f"合計 {result.total_files} 件を確認しました。",
-        f"コピー対象: {len(result.to_copy)} 件 ({result.copy_bytes / (1024 * 1024):.1f} MB)",
-        f"スキップ (既に最新): {len(result.to_skip)} 件",
+        tr("preview_total").format(total=result.total_files),
+        tr("preview_to_copy").format(n=len(result.to_copy), mb=mb),
+        tr("preview_to_skip").format(n=len(result.to_skip)),
     ]
     if result.to_ask:
-        lines.append(f"要確認 (競合あり): {len(result.to_ask)} 件 - コピー中に都度確認します")
+        lines.append(tr("preview_to_ask").format(n=len(result.to_ask)))
     if result.errors:
-        lines.append(f"スキャン中のエラー: {len(result.errors)} 件")
+        lines.append(tr("preview_errors").format(n=len(result.errors)))
     lines.append("")
-    lines.append("この内容でコピーを開始しますか?")
+    lines.append(tr("preview_confirm_prompt"))
     return "\n".join(lines)
