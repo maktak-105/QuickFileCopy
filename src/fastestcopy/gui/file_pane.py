@@ -1,10 +1,16 @@
 """One side of the dual-pane browser, Explorer-style:
 - a persistent navigation tree on the left, grouped exactly like Explorer's
-  left panel: a "PC" node containing local/removable drives, and a
-  "ネットワーク" node containing mapped network drives (classified via
-  GetDriveTypeW - see drives.py). Both are lazily populated on first
-  expand, including subfolders, so opening a slow/offline network share
-  doesn't block anything until you actually expand it.
+  left panel: a "PC" node containing every drive letter - local/removable
+  and mapped network drives alike (classified via GetDriveTypeW - see
+  drives.py) - plus any letter-less "network locations" (UNC shortcuts
+  added via Explorer's "Add a network location" wizard - see
+  netbrowse.list_network_locations), and a "ネットワーク" node containing
+  browsable network computers (via the shell namespace - see netbrowse.py),
+  each expandable into its shares. Every item gets its real native shell
+  icon (QFileIconProvider), same as Explorer. All of these are lazily
+  populated on first expand, including subfolders, so opening a
+  slow/offline network location doesn't block anything until you actually
+  expand it.
 - a content pane on the right showing the current folder's contents
   (double-click a folder to enter it, like Explorer's file list).
 
@@ -17,8 +23,9 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QFileInfo, Signal
 from PySide6.QtWidgets import (
+    QFileIconProvider,
     QFileSystemModel,
     QHBoxLayout,
     QLineEdit,
@@ -31,7 +38,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import drives
+from . import drives, netbrowse
 
 # Sentinel current_path value meaning "the This PC / drive list view", not a
 # real filesystem path.
@@ -39,6 +46,9 @@ COMPUTER = ""
 
 PATH_ROLE = Qt.UserRole
 POPULATED_ROLE = Qt.UserRole + 1
+# Marks a "ネットワーク" child as a computer (expands into its shares via
+# netbrowse.list_shares) rather than a plain folder (expands via os.scandir).
+COMPUTER_ROLE = Qt.UserRole + 2
 
 
 class FilePane(QWidget):
@@ -49,6 +59,7 @@ class FilePane(QWidget):
 
         self.model = QFileSystemModel(self)
         self.model.setRootPath("")
+        self._icon_provider = QFileIconProvider()
 
         self.computer_button = QPushButton("PC")
         self.computer_button.setFixedWidth(36)
@@ -103,11 +114,13 @@ class FilePane(QWidget):
         self.nav_tree.clear()
         pc_item = QTreeWidgetItem(["PC"])
         pc_item.setData(0, PATH_ROLE, None)
+        pc_item.setIcon(0, self._icon_provider.icon(QFileIconProvider.IconType.Computer))
         self._add_dummy_child(pc_item)
         self.nav_tree.addTopLevelItem(pc_item)
 
         network_item = QTreeWidgetItem(["ネットワーク"])
         network_item.setData(0, PATH_ROLE, None)
+        network_item.setIcon(0, self._icon_provider.icon(QFileIconProvider.IconType.Network))
         self._add_dummy_child(network_item)
         self.nav_tree.addTopLevelItem(network_item)
 
@@ -126,13 +139,18 @@ class FilePane(QWidget):
         item.takeChildren()  # drop the dummy placeholder
 
         if item is self._pc_item:
-            local, _network = drives.list_drives()
-            for drive in local:
+            local, network = drives.list_drives()
+            for drive in local + network:
                 self._add_drive_item(item, drive)
+            for name, target in netbrowse.list_network_locations():
+                self._add_named_item(item, name, target)
         elif item is self._network_item:
-            _local, network = drives.list_drives()
-            for drive in network:
-                self._add_drive_item(item, drive)
+            for name, computer_path in netbrowse.list_network_computers():
+                self._add_named_item(item, name, computer_path, is_computer=True)
+        elif item.data(0, COMPUTER_ROLE):
+            path = item.data(0, PATH_ROLE)
+            for name, share_path in netbrowse.list_shares(path):
+                self._add_named_item(item, name, share_path)
         else:
             path = item.data(0, PATH_ROLE)
             if path:
@@ -141,13 +159,29 @@ class FilePane(QWidget):
         item.setData(0, POPULATED_ROLE, True)
 
     def _add_drive_item(self, parent: QTreeWidgetItem, drive: str) -> None:
-        child = QTreeWidgetItem([drives.drive_label(drive)])
-        child.setData(0, PATH_ROLE, drive)
+        icon = self._icon_provider.icon(QFileInfo(drive))
+        self._add_named_item(parent, drives.drive_label(drive), drive, icon=icon)
+
+    def _add_named_item(
+        self,
+        parent: QTreeWidgetItem,
+        label: str,
+        path: str,
+        is_computer: bool = False,
+        icon=None,
+    ) -> None:
+        child = QTreeWidgetItem([label])
+        child.setData(0, PATH_ROLE, path)
+        if is_computer:
+            child.setData(0, COMPUTER_ROLE, True)
+            icon = self._icon_provider.icon(QFileIconProvider.IconType.Computer)
+        elif icon is None:
+            icon = self._icon_provider.icon(QFileInfo(path))
+        child.setIcon(0, icon)
         self._add_dummy_child(child)
         parent.addChild(child)
 
-    @staticmethod
-    def _populate_folder_item(item: QTreeWidgetItem, path: str) -> None:
+    def _populate_folder_item(self, item: QTreeWidgetItem, path: str) -> None:
         try:
             entries = sorted(os.scandir(path), key=lambda e: e.name.lower())
         except OSError:
@@ -157,7 +191,8 @@ class FilePane(QWidget):
                 if entry.is_dir(follow_symlinks=False):
                     child = QTreeWidgetItem([entry.name])
                     child.setData(0, PATH_ROLE, entry.path)
-                    FilePane._add_dummy_child(child)
+                    child.setIcon(0, self._icon_provider.icon(QFileInfo(entry.path)))
+                    self._add_dummy_child(child)
                     item.addChild(child)
             except OSError:
                 continue
@@ -173,20 +208,30 @@ class FilePane(QWidget):
         """
         path = os.path.normpath(path)
         drive_part, tail = os.path.splitdrive(path)
-        drive_part = (drive_part + "\\").upper()
 
-        local, network = drives.list_drives()
-        if drive_part in (d.upper() for d in local):
-            root_item = self._pc_item
-        elif drive_part in (d.upper() for d in network):
-            root_item = self._network_item
+        if drive_part.startswith("\\\\"):
+            # UNC path: \\server\share\... -> ネットワーク > server > share.
+            unc_parts = drive_part.strip("\\").split("\\")
+            if len(unc_parts) < 2:
+                return
+            server_path = "\\\\" + unc_parts[0]
+            self.nav_tree.expandItem(self._network_item)
+            server_item = self._find_child_by_path(self._network_item, server_path)
+            if server_item is None:
+                return
+            self.nav_tree.expandItem(server_item)
+            current = self._find_child_by_path(server_item, drive_part)
+            if current is None:
+                return
         else:
-            return
-
-        self.nav_tree.expandItem(root_item)
-        current = self._find_child_by_path(root_item, drive_part)
-        if current is None:
-            return
+            drive_part = (drive_part + "\\").upper()
+            local, network = drives.list_drives()
+            if drive_part not in (d.upper() for d in local + network):
+                return
+            self.nav_tree.expandItem(self._pc_item)
+            current = self._find_child_by_path(self._pc_item, drive_part)
+            if current is None:
+                return
 
         for part in [p for p in tail.split(os.sep) if p]:
             self.nav_tree.expandItem(current)
