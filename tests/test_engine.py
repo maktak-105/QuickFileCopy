@@ -6,8 +6,9 @@ import time
 
 import pytest
 
-from fastestcopy.engine.copier import run_copy, run_copy_multi
+from fastestcopy.engine.copier import run_copy, run_copy_jobs, run_copy_multi
 from fastestcopy.engine.policy import ConflictPolicy
+from fastestcopy.engine.preview import scan_preview
 
 
 def _make_tree(root, spec):
@@ -353,6 +354,77 @@ def test_run_copy_multi_respects_conflict_policy(tmp_path):
     assert snap["files_copied"] == 0
     assert snap["files_skipped"] == 1
     assert (dst / "a.txt").read_bytes() == b"existing"
+
+
+def test_scan_preview_classifies_new_changed_and_unchanged_files(tmp_path):
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    src.mkdir()
+    dst.mkdir()
+    (src / "unchanged.txt").write_bytes(b"same")
+    (dst / "unchanged.txt").write_bytes(b"same")
+    (src / "changed.txt").write_bytes(b"new version, longer")
+    (dst / "changed.txt").write_bytes(b"old")
+    (src / "brand_new.txt").write_bytes(b"never seen before")
+
+    result = scan_preview([(str(src), str(dst))], ConflictPolicy.OVERWRITE_IF_NEWER)
+
+    assert result.total_files == 3
+    copied_names = {os.path.basename(j.src) for j in result.to_copy}
+    skipped_names = {os.path.basename(j.src) for j in result.to_skip}
+    assert copied_names == {"changed.txt", "brand_new.txt"}
+    assert skipped_names == {"unchanged.txt"}
+    assert result.to_ask == []
+
+
+def test_scan_preview_ask_policy_defers_existing_conflicts(tmp_path):
+    """ASK policy needs a live user decision, which a dry-run preview
+    can't make - those go to to_ask instead of being pre-resolved.
+    """
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    src.mkdir()
+    dst.mkdir()
+    (src / "new.txt").write_bytes(b"a")
+    (src / "conflict.txt").write_bytes(b"b")
+    (dst / "conflict.txt").write_bytes(b"existing")
+
+    result = scan_preview([(str(src), str(dst))], ConflictPolicy.ASK)
+
+    assert len(result.to_copy) == 1  # the genuinely new file
+    assert result.to_copy[0].src.endswith("new.txt")
+    assert len(result.to_ask) == 1  # the pre-existing one needs a live decision
+    assert result.to_ask[0].src.endswith("conflict.txt")
+    assert result.to_skip == []
+
+
+def test_scan_preview_then_run_copy_jobs_copies_only_what_was_flagged(tmp_path):
+    """The end-to-end "scan first, confirm, then copy" flow: preview a
+    large batch where almost everything is already up to date, then copy
+    only the flagged jobs - the untouched majority is never re-visited.
+    """
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    src.mkdir()
+    dst.mkdir()
+    for i in range(200):
+        content = f"content{i}".encode()
+        (src / f"f{i}.txt").write_bytes(content)
+        (dst / f"f{i}.txt").write_bytes(content)
+    for i in range(5):
+        (src / f"new{i}.txt").write_bytes(b"new")
+
+    result = scan_preview([(str(src), str(dst))], ConflictPolicy.SKIP)
+    assert len(result.to_copy) == 5
+    assert len(result.to_skip) == 200
+
+    stats = run_copy_jobs(result.to_copy + result.to_ask, policy=ConflictPolicy.SKIP)
+    snap = stats.snapshot()
+
+    assert snap["files_copied"] == 5
+    assert snap["error_count"] == 0
+    for i in range(5):
+        assert (dst / f"new{i}.txt").read_bytes() == b"new"
 
 
 def test_empty_source_tree_produces_no_errors(tmp_path):

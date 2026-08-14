@@ -109,3 +109,34 @@ def scan_items_and_enqueue(
             stats.add_error(src, e)
     stats.mark_scan_done()
     scan_done.set()
+
+
+def enqueue_prebuilt_jobs(
+    jobs: list[CopyJob],
+    job_queue: "queue.Queue[CopyJob]",
+    stats: CopyStats,
+    stop_event: threading.Event,
+    scan_done: threading.Event,
+) -> None:
+    """Enqueues an already-known job list (from preview.scan_preview)
+    instead of walking the tree - used when the walk already happened as
+    a separate confirm-first step, so re-walking here would be wasted
+    work and could disagree with what the user already confirmed if the
+    filesystem changed in between.
+
+    Each job's destination directory is created here (not during the
+    earlier preview scan, which must not touch the filesystem) before the
+    job is queued, since the preview walk never called os.makedirs.
+    """
+    for job in jobs:
+        if stop_event.is_set():
+            break
+        try:
+            os.makedirs(os.path.dirname(job.dst), exist_ok=True)
+        except OSError as e:
+            stats.add_error(job.dst, e)
+            continue
+        job_queue.put(job)
+        stats.add_found(job.size)
+    stats.mark_scan_done()
+    scan_done.set()

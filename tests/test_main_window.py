@@ -5,6 +5,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+from fastestcopy.gui.copy_dialog import CopyProgressDialog
 from fastestcopy.gui.main_window import MainWindow, _dest_name_for
 
 
@@ -18,6 +19,18 @@ def main_window(qapp, monkeypatch):
     # _validate_copy_pair pops a real modal QMessageBox on failure - stub
     # it out so tests don't block waiting for a user to click it.
     monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
+    # CopyProgressDialog.show_done deliberately leaves the dialog open for
+    # the user to review the "done" summary and click 閉じる themselves
+    # (dialog.exec() only returns once it's accepted/rejected) - simulate
+    # that click immediately so an automated test driving the real
+    # CopyWorker + dialog.exec() flow doesn't hang forever waiting for one.
+    original_show_done = CopyProgressDialog.show_done
+
+    def auto_close_show_done(self, snap):
+        original_show_done(self, snap)
+        self.accept()
+
+    monkeypatch.setattr(CopyProgressDialog, "show_done", auto_close_show_done)
     return MainWindow()
 
 
@@ -59,3 +72,67 @@ def test_validate_copy_pair_blocks_drive_root_source_into_own_subfolder(main_win
     """
     dst_abs = os.path.normcase(os.path.abspath("C:\\Users\\makta\\some_backup"))
     assert main_window._validate_copy_pair("C:\\", dst_abs) is False
+
+
+def test_scan_copy_flow_copies_only_flagged_files(main_window, tmp_path, monkeypatch):
+    """End-to-end through the actual button handler: scan, auto-confirm
+    (question -> Yes), then verify only the genuinely new files were
+    copied - the pre-existing identical ones were never re-touched.
+    """
+    src_data = tmp_path / "srcroot" / "data"
+    dst_root = tmp_path / "dstroot"
+    dst_data = dst_root / "data"
+    src_data.mkdir(parents=True)
+    dst_data.mkdir(parents=True)
+
+    for i in range(50):
+        content = f"c{i}".encode()
+        (src_data / f"f{i}.txt").write_bytes(content)
+        (dst_data / f"f{i}.txt").write_bytes(content)
+    for i in range(5):
+        (src_data / f"new{i}.txt").write_bytes(b"new")
+
+    main_window.source_pane.set_path(str(src_data))
+    main_window.target_pane.set_path(str(dst_root))
+
+    questions = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *a, **k: (questions.append(a), QMessageBox.Yes)[1],
+    )
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+
+    main_window._on_scan_copy_clicked()
+
+    assert questions  # the confirmation dialog was actually shown
+    for i in range(5):
+        assert (dst_data / f"new{i}.txt").read_bytes() == b"new"
+    for i in range(50):
+        assert (dst_data / f"f{i}.txt").read_bytes() == f"c{i}".encode()
+
+
+def test_scan_copy_flow_skips_when_nothing_to_copy(main_window, tmp_path, monkeypatch):
+    """When every file is already up to date, the flow should inform the
+    user and stop - no confirmation prompt, no CopyWorker run.
+    """
+    src_data = tmp_path / "srcroot" / "data"
+    dst_root = tmp_path / "dstroot"
+    dst_data = dst_root / "data"
+    src_data.mkdir(parents=True)
+    dst_data.mkdir(parents=True)
+    (src_data / "a.txt").write_bytes(b"same")
+    (dst_data / "a.txt").write_bytes(b"same")
+
+    main_window.source_pane.set_path(str(src_data))
+    main_window.target_pane.set_path(str(dst_root))
+
+    questions = []
+    infos = []
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: (questions.append(a), QMessageBox.Yes)[1])
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: infos.append(a))
+
+    main_window._on_scan_copy_clicked()
+
+    assert infos  # told the user nothing needed copying
+    assert not questions  # never reached the confirm-and-copy step

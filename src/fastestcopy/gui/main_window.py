@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Optional
 
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
@@ -19,7 +20,15 @@ from PySide6.QtWidgets import (
 
 from fastestcopy.engine.policy import ConflictPolicy
 
-from .copy_dialog import ConflictAsker, CopyProgressDialog, CopyWorker, format_eta
+from .copy_dialog import (
+    ConflictAsker,
+    CopyProgressDialog,
+    CopyWorker,
+    ScanProgressDialog,
+    ScanWorker,
+    format_eta,
+    format_preview_summary,
+)
 from .elevate import is_admin, relaunch_as_admin
 from .file_pane import FilePane
 from .settings_dialog import CopySettings, SettingsDialog
@@ -77,6 +86,12 @@ class MainWindow(QMainWindow):
         self.copy_button.setFixedHeight(40)
         self.copy_button.clicked.connect(self._on_copy_clicked)
 
+        self.scan_copy_button = QPushButton("スキャンしてコピー →")
+        self.scan_copy_button.setToolTip(
+            "先に対象全体をスキャンしてコピー件数を確認し、確認後にコピーを開始します。"
+        )
+        self.scan_copy_button.clicked.connect(self._on_scan_copy_clicked)
+
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         self.progress_label = QLabel("")
@@ -97,6 +112,7 @@ class MainWindow(QMainWindow):
         center_layout.addWidget(self.policy_combo)
         center_layout.addWidget(self.show_hidden_checkbox)
         center_layout.addWidget(self.copy_button)
+        center_layout.addWidget(self.scan_copy_button)
         center_layout.addWidget(self.progress_bar)
         center_layout.addWidget(self.progress_label)
         center_layout.addWidget(self.privilege_label)
@@ -170,11 +186,16 @@ class MainWindow(QMainWindow):
             return False
         return True
 
-    def _on_copy_clicked(self) -> None:
+    def _build_copy_items(self) -> Optional[list[tuple[str, str]]]:
+        """Resolves the current source/target pane selections into
+        [(src, dst), ...] pairs, showing an error dialog and returning
+        None if anything's invalid. Shared by the normal copy button and
+        the scan-first-then-copy button below.
+        """
         dst = self.target_pane.selected_path()
         if not dst or not os.path.isdir(dst):
             QMessageBox.warning(self, "エラー", "コピー先フォルダを選択してください。")
-            return
+            return None
         dst_abs = os.path.normcase(os.path.abspath(dst))
 
         rows = self.source_pane.selected_rows()
@@ -183,7 +204,7 @@ class MainWindow(QMainWindow):
         sources = rows if rows else [self.source_pane.selected_path()]
         if not sources[0] or not os.path.exists(sources[0]):
             QMessageBox.warning(self, "エラー", "コピー元を選択してください。")
-            return
+            return None
 
         # Every item - file or folder - keeps its own name at dst, same as
         # an Explorer paste: a folder becomes a same-named subfolder there
@@ -191,10 +212,19 @@ class MainWindow(QMainWindow):
         items = []
         for src in sources:
             if not self._validate_copy_pair(src, dst_abs):
-                return
+                return None
             items.append((src, os.path.join(dst, _dest_name_for(src))))
+        return items
 
-        policy = _POLICY_LABELS[self.policy_combo.currentText()]
+    def _current_policy(self) -> ConflictPolicy:
+        return _POLICY_LABELS[self.policy_combo.currentText()]
+
+    def _on_copy_clicked(self) -> None:
+        items = self._build_copy_items()
+        if items is None:
+            return
+
+        policy = self._current_policy()
         ask_cb = self.conflict_asker.ask if policy is ConflictPolicy.ASK else None
 
         dialog = CopyProgressDialog(self)
@@ -208,6 +238,75 @@ class MainWindow(QMainWindow):
             preallocate_large=self.settings.preallocate_large,
             parent=self,
         )
+        self._run_copy_worker(worker, dialog)
+
+    def _on_scan_copy_clicked(self) -> None:
+        items = self._build_copy_items()
+        if items is None:
+            return
+        policy = self._current_policy()
+
+        scan_dialog = ScanProgressDialog(self)
+        scan_worker = ScanWorker(items, policy, parent=self)
+        scan_dialog.cancel_requested.connect(scan_worker.cancel)
+
+        outcome: dict = {}
+
+        def on_scan_done(result):
+            outcome["result"] = result
+            scan_dialog.accept()
+
+        def on_scan_failed(msg):
+            outcome["error"] = msg
+            scan_dialog.accept()
+
+        scan_worker.finished_ok.connect(on_scan_done)
+        scan_worker.failed.connect(on_scan_failed)
+
+        scan_worker.start()
+        scan_dialog.exec()
+        scan_worker.wait()
+
+        if "error" in outcome:
+            QMessageBox.warning(self, "エラー", f"スキャン中にエラーが発生しました:\n{outcome['error']}")
+            return
+
+        result = outcome.get("result")
+        if result is None or result.cancelled:
+            return
+
+        jobs = result.to_copy + result.to_ask
+        if not jobs:
+            QMessageBox.information(
+                self,
+                "スキャン完了",
+                f"合計 {result.total_files} 件を確認しましたが、"
+                "すべて既に最新のためコピーは不要です。",
+            )
+            return
+
+        reply = QMessageBox.question(
+            self, "コピーの確認", format_preview_summary(result), QMessageBox.Yes | QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        ask_cb = self.conflict_asker.ask if policy is ConflictPolicy.ASK else None
+        dialog = CopyProgressDialog(self)
+        worker = CopyWorker(
+            None,
+            policy,
+            ask_callback=ask_cb,
+            small_workers=self.settings.small_workers,
+            large_chunk_workers=self.settings.large_chunk_workers,
+            buffer_mb=self.settings.buffer_mb,
+            preallocate_large=self.settings.preallocate_large,
+            jobs=jobs,
+            parent=self,
+        )
+        self._run_copy_worker(worker, dialog)
+
+    def _run_copy_worker(self, worker: CopyWorker, dialog: CopyProgressDialog) -> None:
         worker.progress.connect(dialog.update_progress)
         worker.progress.connect(self._update_center_progress)
         worker.finished_ok.connect(lambda snap: self._on_copy_done(dialog, snap))

@@ -11,7 +11,7 @@ from typing import Callable, Optional
 
 from . import planner, winio
 from .policy import AskCallback, ConflictAction, ConflictPolicy, resolve_conflict
-from .scanner import CopyJob, scan_and_enqueue, scan_items_and_enqueue
+from .scanner import CopyJob, enqueue_prebuilt_jobs, scan_and_enqueue, scan_items_and_enqueue
 from .stats import CopyStats
 
 ProgressCallback = Callable[[dict], None]
@@ -239,6 +239,44 @@ def run_copy_multi(
     return _run_copy_pipeline(
         scan_items_and_enqueue,
         (items,),
+        policy=policy,
+        ask_callback=ask_callback,
+        small_threshold=small_threshold,
+        small_workers=small_workers,
+        large_file_concurrency=large_file_concurrency,
+        large_chunk_workers=large_chunk_workers,
+        buffer_size=buffer_size,
+        preallocate_large=preallocate_large,
+        progress_cb=progress_cb,
+        progress_interval=progress_interval,
+        stop_event=stop_event,
+    )
+
+
+def run_copy_jobs(
+    jobs: list[CopyJob],
+    *,
+    policy: ConflictPolicy = ConflictPolicy.SKIP,
+    ask_callback: Optional[AskCallback] = None,
+    small_threshold: int = planner.SMALL_FILE_THRESHOLD,
+    small_workers: Optional[int] = None,
+    large_file_concurrency: Optional[int] = None,
+    large_chunk_workers: Optional[int] = None,
+    buffer_size: int = winio.DEFAULT_BUFFER_SIZE,
+    preallocate_large: bool = True,
+    progress_cb: Optional[ProgressCallback] = None,
+    progress_interval: float = 0.2,
+    stop_event: Optional[threading.Event] = None,
+) -> CopyStats:
+    """Copies an already-known job list directly, skipping the scan phase
+    entirely - for a "scan first, show what would happen, confirm, then
+    copy" flow where preview.scan_preview already did the walk as a
+    separate step. Each job still goes through the normal conflict
+    resolution (so ConflictPolicy.ASK jobs get their live prompt here).
+    """
+    return _run_copy_pipeline(
+        enqueue_prebuilt_jobs,
+        (jobs,),
         policy=policy,
         ask_callback=ask_callback,
         small_threshold=small_threshold,

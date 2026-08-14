@@ -21,8 +21,10 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtCore import QObject
 
-from fastestcopy.engine.copier import run_copy_multi
+from fastestcopy.engine.copier import run_copy_jobs, run_copy_multi
 from fastestcopy.engine.policy import ConflictAction, ConflictPolicy
+from fastestcopy.engine.preview import PreviewResult, scan_preview
+from fastestcopy.engine.scanner import CopyJob
 
 from .copy_log import write_error_log
 
@@ -89,22 +91,25 @@ class CopyWorker(QThread):
 
     def __init__(
         self,
-        items: list[tuple[str, str]],
+        items: Optional[list[tuple[str, str]]],
         policy: ConflictPolicy,
         ask_callback=None,
         small_workers: Optional[int] = None,
         large_chunk_workers: Optional[int] = None,
         buffer_mb: int = 4,
         preallocate_large: bool = True,
+        jobs: Optional[list[CopyJob]] = None,
         parent=None,
     ):
-        """items: [(src, dst), ...] to copy, each keeping its own name at
-        its own dst (Explorer-style paste) - a single selected folder
-        becomes one item, so it lands as a same-named subfolder rather
-        than merging its contents into dst.
+        """Copies either `items` ([(src, dst), ...], each keeping its own
+        name at dst - Explorer-style paste, walked and copied together)
+        or a pre-scanned `jobs` list (from preview.scan_preview, already
+        confirmed by the user) which skips scanning entirely and copies
+        exactly those jobs. Pass exactly one of items/jobs.
         """
         super().__init__(parent)
         self.items = items
+        self.jobs = jobs
         self.policy = policy
         self.ask_callback = ask_callback
         self.small_workers = small_workers
@@ -128,7 +133,10 @@ class CopyWorker(QThread):
                 progress_cb=lambda snap: self.progress.emit(snap),
                 stop_event=self.stop_event,
             )
-            stats = run_copy_multi(self.items, **kwargs)
+            if self.jobs is not None:
+                stats = run_copy_jobs(self.jobs, **kwargs)
+            else:
+                stats = run_copy_multi(self.items, **kwargs)
             self.finished_ok.emit(stats.snapshot())
         except Exception:  # noqa: BLE001 - full traceback, not just str(e), goes to the error log
             self.failed.emit(traceback.format_exc())
@@ -226,3 +234,86 @@ class CopyProgressDialog(QDialog):
     def _on_open_log(self) -> None:
         if self.log_path:
             os.startfile(self.log_path)
+
+
+class ScanWorker(QThread):
+    """Runs preview.scan_preview off the GUI thread for "scan first, show
+    what would happen, then confirm" copies - same shape as CopyWorker,
+    but read-only and much lighter (no dialogs, one signal instead of
+    three).
+    """
+
+    finished_ok = Signal(object)  # PreviewResult
+    failed = Signal(str)
+
+    def __init__(self, items: list[tuple[str, str]], policy: ConflictPolicy, parent=None):
+        super().__init__(parent)
+        self.items = items
+        self.policy = policy
+        self.stop_event = threading.Event()
+
+    def cancel(self) -> None:
+        self.stop_event.set()
+
+    def run(self) -> None:
+        try:
+            result = scan_preview(self.items, self.policy, stop_event=self.stop_event)
+            self.finished_ok.emit(result)
+        except Exception:  # noqa: BLE001
+            self.failed.emit(traceback.format_exc())
+
+
+class ScanProgressDialog(QDialog):
+    """Small modal shown while ScanWorker walks the source tree(s) - no
+    live count (the walk is read-only and usually much faster than the
+    copy itself), just an indeterminate spinner and a cancel option.
+    """
+
+    cancel_requested = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("スキャン中...")
+        self.setModal(True)
+        self.resize(360, 120)
+
+        self.info_label = QLabel("コピー対象を確認しています...")
+        self.info_label.setWordWrap(True)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)
+
+        self.close_button = QPushButton("キャンセル")
+        self.close_button.clicked.connect(self._on_cancel)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        btn_row.addWidget(self.close_button)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.info_label)
+        layout.addWidget(self.progress_bar)
+        layout.addLayout(btn_row)
+
+    def _on_cancel(self) -> None:
+        self.cancel_requested.emit()
+        self.close_button.setEnabled(False)
+        self.info_label.setText("キャンセル中...")
+
+
+def format_preview_summary(result: PreviewResult) -> str:
+    """Confirmation text shown before an actually-scanned copy starts:
+    how many of the total were already up to date vs. need copying.
+    """
+    lines = [
+        f"合計 {result.total_files} 件を確認しました。",
+        f"コピー対象: {len(result.to_copy)} 件 ({result.copy_bytes / (1024 * 1024):.1f} MB)",
+        f"スキップ (既に最新): {len(result.to_skip)} 件",
+    ]
+    if result.to_ask:
+        lines.append(f"要確認 (競合あり): {len(result.to_ask)} 件 - コピー中に都度確認します")
+    if result.errors:
+        lines.append(f"スキャン中のエラー: {len(result.errors)} 件")
+    lines.append("")
+    lines.append("この内容でコピーを開始しますか?")
+    return "\n".join(lines)
