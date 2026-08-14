@@ -1,32 +1,58 @@
 # FastestCopy
 
 Windows標準のエクスプローラー/Robocopyより高速なファイルコピーアプリ。
-Explorer風のデュアルペインGUI(左=ソース、右=ターゲット)、スキップ/上書きの
-競合ポリシー選択、Python実装からNuitkaによるexeビルドまでを含む。
+Explorer風のデュアルペインGUI(上=コピー元、下=コピー先)、スキップ/上書きの
+競合ポリシー選択、日本語/英語UI、Python実装からNuitkaによるexeビルドまでを含む。
 
 ## 特徴
 
-1. **Explorer風デュアルペインUI** (PySide6) - 左ペインでソース、右ペインでターゲットを
-   Explorerのようにブラウズして選択し、中央の「コピー →」ボタンで実行。各ペインは
-   さらに左右に分かれており、左側に常時表示のナビゲーションツリー、右側に選択中
-   フォルダの内容一覧を表示する。ナビゲーションツリーはExplorer同様「PC」(ローカル/
-   リムーバブルドライブ)と「ネットワーク」(`net use`等で割り当てたネットワークドライブ)
-   に分けて表示し([drives.py](src/fastestcopy/gui/drives.py)で`GetDriveTypeW`により
-   種別判定)、サブフォルダも展開時に遅延読み込みする。「PC」ボタン/「上へ」でドライブ
-   ルートからドライブ一覧へも戻れる(Explorer同様、C:\がナビゲーションの終端にならない)。
-   `\\server\share`形式のUNCパスもパスバーに直接入力して移動可能。
+1. **Explorer風デュアルペインUI** (PySide6) - 上側でコピー元、下側でコピー先を
+   Explorerのようにブラウズして選択し(間の▼が上→下のコピー方向を示す)、右側の
+   「コピー →」ボタンで実行。各ペインはさらに左右に分かれており、左側に常時表示の
+   ナビゲーションツリー、右側に選択中フォルダの内容一覧を表示する。
+   - **PC**: ローカル/リムーバブルドライブ、`net use`等で割り当て済みのネットワーク
+     ドライブ、および「ネットワークの場所」ショートカット(ドライブレターなし)を一覧表示
+     ([drives.py](src/fastestcopy/gui/drives.py)で`GetDriveTypeW`により種別判定)。
+   - **ネットワーク**: シェルの名前空間を辿ってネットワーク上のコンピューターを検出・
+     表示し(Explorerと同じ発見方法、SSDPノイズは除外)、展開すると各コンピューターの
+     共有フォルダが見える([netbrowse.py](src/fastestcopy/gui/netbrowse.py))。
+   - すべての項目(ドライブ・コンピューター・共有・フォルダ)にOSネイティブのアイコンを
+     表示(`QFileIconProvider`)。
+   - `\\server\share`形式のUNCパスもパスバーに直接入力して移動可能。
+   - コンテンツペインは**Shift+クリックで範囲選択、Ctrl+クリックで個別選択**に対応
+     (Explorer同様)。フォルダをコピーすると同名のサブフォルダがコピー先に作られる
+     (中身を直接マージする一昔前の挙動は廃止)。
+   - 「隠しファイル/フォルダを表示」チェックボックス(デフォルトOFF)でWindowsの
+     「隠し」属性付きアイテムの表示切替。
 2. **Robocopyより高速なコピーエンジン** - I/Oバウンドな処理特性を踏まえ、Pythonから
    `ctypes`でkernel32を直接呼び出すことでpywin32のオーバーヘッドを回避しつつ、
    小ファイルはスレッドプールによるファイル単位並列化、巨大ファイルは
    (管理者権限があれば)チャンク単位の並列書き込みで高速化する。詳細は
    [src/fastestcopy/engine](src/fastestcopy/engine)と下記ベンチマーク結果を参照。
 3. **競合ポリシー** - スキップ/上書き/新しい方のみ上書き/毎回確認 の4種類を選択可能。
-4. **参考実装調査** - GitHub上の定番OSS [FastCopy](https://github.com/shirouzu/FastCopy)
+4. **スキャンしてコピー** - 「スキャンしてコピー →」ボタンで、実際にコピーする前に
+   対象全体を読み取り専用でスキャンし、「コピー対象は何件、スキップは何件」を
+   確認してから実行できる([preview.py](src/fastestcopy/engine/preview.py))。
+   確認後は判定済みのジョブリストをそのままコピーに渡すため、二重にツリーを
+   走査しない。
+5. **進捗・キャンセル・エラーログ**
+   - コピー中は進捗率(%)・推定残り時間・MB/s・files/sを進捗ダイアログと
+     メイン画面中央の両方に表示。
+   - キャンセルは大容量ファイルのコピー中でもほぼ即座に反映され(4MBバッファ単位で
+     チェック)、書きかけの不完全なファイルは自動削除される。
+   - コピーエラーが発生した場合、ファイル名と原因を記録したログを
+     `%LOCALAPPDATA%\FastestCopy\logs\` に自動保存し、完了ダイアログから直接開ける。
+6. **日本語/英語UI + ヘルプ** - 「ツール>言語」でUI言語を切替可能(再起動で反映、
+   設定は保持される)。「ヘルプ」メニューから使い方ガイドを日本語/英語で表示。
+7. **参考実装調査** - GitHub上の定番OSS [FastCopy](https://github.com/shirouzu/FastCopy)
    (C++, 非同期I/O・SetFileValidData活用)を`reference/FastCopy`にクローンし、
    設計の参考にした(直接組み込みはせず、自作Pythonエンジンとして再設計)。
-5. **ベンチマーク** - 小さいファイルが大量にある多数フォルダのシナリオと、
-   巨大ファイル少数のシナリオの両方でRobocopyと速度比較([benchmark/results](benchmark/results))。
-6. **Python実装 → Nuitkaでexe化** - 開発はPythonで行い、最終的に
+   実際にインストールされたFastCopyとの直接比較ベンチマークも実施
+   ([fastcopy_comparison.md](benchmark/results/fastcopy_comparison.md))。
+8. **ベンチマーク** - 小さいファイルが大量にある多数フォルダのシナリオと、
+   巨大ファイル少数のシナリオの両方でRobocopy/FastCopyと速度比較
+   ([benchmark/results](benchmark/results))。
+9. **Python実装 → Nuitkaでexe化** - 開発はPythonで行い、最終的に
    [Nuitka](https://nuitka.net/)で`FastestCopy.exe`としてコンパイルする
    (`build_exe.ps1`)。コピー速度自体はI/Oバウンドなためコンパイルでは変わらないが、
    配布のしやすさと起動速度のために採用。
@@ -79,6 +105,13 @@ Explorer風のデュアルペインGUI(左=ソース、右=ターゲット)、�
 管理者権限で実行した場合の高速化は未検証 -
 `python benchmark\run_benchmark.py --src <大ファイルフォルダ> --work <作業フォルダ>` を
 管理者PowerShellで再実行することで確認できる。
+
+### FastCopyとの直接比較
+
+実際にインストールされた[FastCopy](https://fastcopy.jp/)(H.Shirouzu氏、CLI版`fcp.exe`)とも
+同一データセットで比較した([fastcopy_comparison.md](benchmark/results/fastcopy_comparison.md))。
+小ファイル大量シナリオではFastestCopyがFastCopy(既定設定)比で約3.3倍高速、
+大容量ファイル少数シナリオでは3エンジンともディスク帯域で頭打ちになり実質横並びだった。
 
 ## セットアップ
 
@@ -156,10 +189,7 @@ CLI版(`FastestCopy-CLI.exe`、Qt非依存で軽量・ビルドも高速。ベ�
 - 巨大ファイルの真の並列チャンクコピーには管理者権限が必要(`SetFileValidData`のため)。
   非管理者時は安全な逐次コピーにフォールバックする。
 - ストレージ種別(SSD/HDD)の自動判定は未実装。ワーカー数は`ツール>設定`から手動調整可能。
-- ナビゲーションツリーの「ネットワーク」に表示されるのは`net use`等で**ドライブ文字に
-  割り当て済み**のネットワークドライブのみ(`GetDriveTypeW`で判定)。Explorerの「ネットワーク」
-  のようなドライブ未割り当てのコンピューター/共有フォルダの探索(ネットワーク近隣探索)は
-  未対応 - 未割り当ての共有は`\\server\share`をパスバーに直接入力すれば開ける。
+- 言語切替(ツール>言語)は再起動後に反映される方式(ウィジェットのライブ再翻訳は未対応)。
 
 ## プロジェクト構成
 
@@ -168,17 +198,23 @@ src/fastestcopy/
   engine/         # コピーエンジン本体 (GUI非依存)
     winio.py        # ctypesによるWinAPI直接呼び出し (CopyFileExW/ReadFile/WriteFile/SetFileValidData)
     scanner.py       # ディレクトリ列挙(パイプライン化)
+    preview.py       # 読み取り専用の事前スキャン(スキャンしてコピー用の判定)
     copier.py        # スレッドプールオーケストレーション
     policy.py        # スキップ/上書き/新しい方優先/毎回確認
     planner.py       # ワーカー数・チャンク戦略の決定
-    stats.py         # 進捗・スループット集計
+    stats.py         # 進捗・スループット・ETA集計
   gui/            # PySide6 デュアルペインGUI
-    main_window.py   # メインウィンドウ、ツールメニュー
+    main_window.py   # メインウィンドウ、メニュー、コピー元/コピー先ペインの配置
     file_pane.py      # 片側ペイン (PC/ネットワーク ナビゲーションツリー + 内容一覧)
-    drives.py         # ドライブ種別判定(ローカル/ネットワーク)・ラベル取得
-    copy_dialog.py    # コピー実行スレッド・進捗ダイアログ・競合確認ダイアログ
+    drives.py         # ローカル/ネットワークドライブの種別判定・ラベル取得
+    netbrowse.py      # シェル名前空間経由のネットワークコンピューター/共有の探索
+    copy_dialog.py    # コピー/スキャン実行スレッド・進捗ダイアログ・競合確認ダイアログ
+    copy_log.py       # コピーエラーのログファイル出力
     settings_dialog.py
-    elevate.py        # 管理者として再起動
+    elevate.py        # 管理者/通常権限での再起動
+    i18n.py           # UI文字列の日英切替
+    help_content.py   # ヘルプ本文(日英、埋め込み)
+    help_dialog.py    # ヘルプダイアログ
   cli.py          # ヘッドレスCLI
 assets/           # アイコン素材 (icon.svg / icon.ico)
 benchmark/        # ベンチマーク生成・実行スクリプトと結果
