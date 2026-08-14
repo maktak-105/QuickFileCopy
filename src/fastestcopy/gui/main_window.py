@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from typing import Optional
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -63,7 +64,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("FastestCopy" + (" (管理者)" if is_admin() else ""))
-        self.resize(1300, 750)
+        self.resize(950, 900)
 
         self.settings = CopySettings()
         self.conflict_asker = ConflictAsker(self)
@@ -118,15 +119,37 @@ class MainWindow(QMainWindow):
         center_layout.addWidget(self.privilege_label)
         center_layout.addStretch()
 
-        splitter = QSplitter()
-        splitter.addWidget(self.source_pane)
-        splitter.addWidget(center)
-        splitter.addWidget(self.target_pane)
-        splitter.setStretchFactor(0, 4)
-        splitter.setStretchFactor(1, 0)
-        splitter.setStretchFactor(2, 4)
+        # Source/target stacked vertically (each still gets its own PC /
+        # ネットワーク nav tree + content pane side-by-side internally) so
+        # the window stays roughly square instead of sprawling wide with
+        # three side-by-side columns. Labeled and separated by a down
+        # arrow so the top-to-bottom copy direction reads at a glance.
+        source_label = QLabel("コピー元")
+        source_label.setStyleSheet("font-weight: bold; font-size: 13px;")
+        target_label = QLabel("コピー先")
+        target_label.setStyleSheet("font-weight: bold; font-size: 13px;")
 
-        self.setCentralWidget(splitter)
+        arrow_label = QLabel("▼")
+        arrow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        arrow_label.setStyleSheet("font-size: 22px; color: #555;")
+
+        panes_container = QWidget()
+        panes_layout = QVBoxLayout(panes_container)
+        panes_layout.setContentsMargins(0, 0, 0, 0)
+        panes_layout.setSpacing(2)
+        panes_layout.addWidget(source_label)
+        panes_layout.addWidget(self.source_pane, 1)
+        panes_layout.addWidget(arrow_label)
+        panes_layout.addWidget(target_label)
+        panes_layout.addWidget(self.target_pane, 1)
+
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        main_splitter.addWidget(panes_container)
+        main_splitter.addWidget(center)
+        main_splitter.setStretchFactor(0, 1)
+        main_splitter.setStretchFactor(1, 0)
+
+        self.setCentralWidget(main_splitter)
         self.setStatusBar(QStatusBar())
         self.statusBar().showMessage("準備完了")
 
