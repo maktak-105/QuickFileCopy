@@ -17,7 +17,7 @@ HELP_JA = """
 <h3>ナビゲーションツリー(左側)</h3>
 <ul>
 <li><b>PC</b>: ローカルドライブ、マップ済みネットワークドライブ、「ネットワークの場所」ショートカットの一覧。</li>
-<li><b>ネットワーク</b>: ネットワーク上のコンピューター(BEELINK など)を表示。展開すると各コンピューターの共有フォルダが表示されます。</li>
+<li><b>ネットワーク</b>: ネットワーク上のコンピューター(LocalPC1 など)を表示。展開すると各コンピューターの共有フォルダが表示されます。環境によっては少し時間がかかります、そのままお待ちください。</li>
 <li>アドレスバーに直接パス(UNCパス <code>\\\\server\\share</code> も可)を入力して移動できます。</li>
 </ul>
 
@@ -71,7 +71,7 @@ HELP_EN = """
 <h3>Navigation Tree (left side)</h3>
 <ul>
 <li><b>PC</b>: local drives, mapped network drives, and "network location" shortcuts.</li>
-<li><b>Network</b>: computers visible on the network (e.g. BEELINK). Expand one to browse its shared folders.</li>
+<li><b>Network</b>: computers visible on the network (e.g. LocalPC1). Expand one to browse its shared folders. This may take a little time depending on your environment, please wait.</li>
 <li>You can also type a path directly into the address bar (UNC paths like <code>\\\\server\\share</code> work too).</li>
 </ul>
 

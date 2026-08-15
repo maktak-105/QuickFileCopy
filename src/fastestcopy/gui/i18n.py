@@ -39,8 +39,8 @@ _STRINGS: dict[str, dict[str, str]] = {
         "en": "Restart failed - please restart the app manually.",
     },
     # -- main window ------------------------------------------------------
-    "pane_source_label": {"ja": "コピー元", "en": "Source"},
-    "pane_target_label": {"ja": "コピー先", "en": "Target"},
+    "pane_source_label": {"ja": "    コピー元", "en": "    Source"},
+    "pane_target_label": {"ja": "    コピー先", "en": "    Target"},
     "policy_group_label": {"ja": "競合ポリシー:", "en": "Conflict policy:"},
     "policy_skip": {"ja": "スキップ (既存を保持)", "en": "Skip (keep existing)"},
     "policy_overwrite": {"ja": "上書き", "en": "Overwrite"},

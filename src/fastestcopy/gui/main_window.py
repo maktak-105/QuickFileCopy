@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QAction, QActionGroup
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -207,8 +207,9 @@ class MainWindow(QMainWindow):
         )
         if reply != QMessageBox.Yes:
             return
-        if relaunch_normal():
-            self.close()
+        hwnd = int(self.winId()) if self.effectiveWinId() else 0
+        if relaunch_normal(hwnd=hwnd):
+            QTimer.singleShot(100, self.close)
         else:
             QMessageBox.warning(self, tr("error_title"), tr("restart_failed"))
 
@@ -230,10 +231,13 @@ class MainWindow(QMainWindow):
         )
         if reply != QMessageBox.Yes:
             return
-        if relaunch_as_admin():
-            self.close()
-        else:
+        hwnd = int(self.winId()) if self.effectiveWinId() else 0
+        res = relaunch_as_admin(hwnd=hwnd)
+        if res is True:
+            QTimer.singleShot(100, self.close)
+        elif res is False:
             QMessageBox.warning(self, tr("error_title"), tr("elevate_failed"))
+
 
     def _validate_copy_pair(self, src: str, dst_abs: str) -> bool:
         """False (with an error dialog) if src can't be copied into the

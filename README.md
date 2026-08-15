@@ -197,7 +197,18 @@ CLI版(`FastestCopy-CLI.exe`、Qt非依存で軽量・ビルドも高速。ベ�
 - 巨大ファイルの真の並列チャンクコピーには管理者権限が必要(`SetFileValidData`のため)。
   非管理者時は安全な逐次コピーにフォールバックする。
 - ストレージ種別(SSD/HDD)の自動判定は未実装。ワーカー数は`ツール>設定`から手動調整可能。
-- 言語切替(ツール>言語)は再起動後に反映される方式(ウィジェットのライブ再翻訳は未対応)。
+- 言語切替(ツール>言語)は再起動後に反映される方式(設定はWindowsレジストリ`QSettings`に自動保存・保持されます)。
+
+## 最近の修正・改善内容
+
+- **メニューからのアプリ再起動・管理者昇格の安定化 ([elevate.py](src/fastestcopy/gui/elevate.py), [main_window.py](src/fastestcopy/gui/main_window.py))**:
+  - `ShellExecuteW` 呼び出し時の作業ディレクトリ (`cwd`) 保持および親ウィンドウ (`hwnd`) の伝達を適用。
+  - Nuitka `--onefile` 単一 executable 実行環境において、一時展開用バイナリではなくオリジナルの `.exe` パス (`NUITKA_ONEFILE_BINARY` / `sys.argv[0]`) を追跡・指定して再起動するよう改修。
+  - 通常権限での再起動時のプロセス切り離し (`hwnd=0`) と `QTimer.singleShot` による安全なウィンドウクローズを適用し、旧ウィンドウ終了に伴う道連れ終了を防止。
+  - ユーザーが UAC 確認で「いいえ」を選択した場合のキャンセルハンドリングおよび `%LOCALAPPDATA%\FastestCopy\logs\relaunch.log` への自動ログ記録を追加。
+- **UIおよびヘルプ表記の改善 ([i18n.py](src/fastestcopy/gui/i18n.py), [help_content.py](src/fastestcopy/gui/help_content.py))**:
+  - メイン画面の「コピー元」「コピー先」ラベルの先頭にインデント（半角4文字分）を付与。
+  - ヘルプダイアログの「ナビゲーションツリー (左側)」->「ネットワーク」の説明に LocalPC1 表記および探索時の注意事項（「環境によっては少し時間がかかります、そのままお待ちください」）を追加。
 
 ## プロジェクト構成
 
