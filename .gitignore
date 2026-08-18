@@ -1,14 +1,42 @@
-.venv/
+# Python and test caches
 __pycache__/
-*.pyc
-build/
-dist/
-*.dist/
-*.build/
-*.onefile-build/
-benchmark/testdata/
-benchmark/results/*.json
-*.egg-info/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
 .pytest_cache/
-reference/
+*.egg-info/
+.env
+
+# Editors and local tools
+.vscode/
+.idea/
 .claude/
+
+# C++ and CMake outputs
+build/
+core/native/*.dll
+core/native/*.o
+core/native/resources/QuickFileCopy.html
+
+# Distribution binaries are generated; distribution documents are retained.
+dist/binary/*
+!dist/binary/.gitkeep
+dist/*.zip
+
+# Benchmark data generated on local machines
+benchmark/testdata/
+benchmark/**/results/*.json
+
+# Prototype build outputs
+prototype/python/*.dist/
+prototype/python/*.build/
+prototype/python/*.onefile-build/
+
+# Reference repositories and logs
+reference/
+*.log
+*.dat
+*_debug.log
+CODEX_PROJECT_NOTE.txt

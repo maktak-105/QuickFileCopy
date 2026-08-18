@@ -1,0 +1,77 @@
+name: Build and upload distribution asset
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag, for example v0.1.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install MinGW-w64
+        shell: pwsh
+        run: choco install mingw --yes --no-progress
+
+      - name: Download WebView2 SDK
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:RUNNER_TEMP 'webview2.zip'
+          $sdk = Join-Path $env:RUNNER_TEMP 'webview2'
+          Invoke-WebRequest 'https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2' -OutFile $package
+          Expand-Archive -LiteralPath $package -DestinationPath $sdk -Force
+          "WEBVIEW2_INCLUDE=$sdk\build\native\include" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "WEBVIEW2_LOADER=$sdk\runtimes\win-x64\native\WebView2Loader.dll" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build and test
+        shell: pwsh
+        run: |
+          python build_native.py
+          if ($LASTEXITCODE -ne 0) { throw 'Native build failed' }
+          python core\native\tests\native_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw 'Smoke tests failed' }
+
+      - name: Package flat distribution
+        shell: pwsh
+        run: |
+          $files = @(
+            'dist/binary/QuickFileCopy.exe',
+            'dist/binary/QuickFileCopy_cli.exe',
+            'dist/binary/WebView2Loader.dll',
+            'dist/documents/readme.txt',
+            'dist/documents/readme_jp.txt',
+            'dist/documents/history.txt',
+            'dist/documents/history_jp.txt',
+            'dist/documents/LICENSE.txt',
+            'dist/documents/LICENSE_jp.txt'
+          )
+          foreach ($file in $files) {
+            if (!(Test-Path -LiteralPath $file)) { throw "Missing distribution file: $file" }
+          }
+          $staging = Join-Path $env:RUNNER_TEMP 'QuickFileCopy-package'
+          New-Item -ItemType Directory -Path $staging -Force | Out-Null
+          foreach ($file in $files) { Copy-Item -LiteralPath $file -Destination $staging -Force }
+          Compress-Archive -Path (Join-Path $staging '*') -DestinationPath 'QuickFileCopy-binary.zip' -Force
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          files: QuickFileCopy-binary.zip
+          overwrite_files: true
+          generate_release_notes: true
+          body: |
+            Download `QuickFileCopy-binary.zip`, extract every file into one folder, and run `QuickFileCopy.exe`.
+            The GUI is embedded in the executable; no external `index.html` is required.

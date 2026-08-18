@@ -1,0 +1,10 @@
+QuickFileCopy - Change log
+
+v0.1.0 (2026-08-18)
+- Added the native C++ copy engine and compact WebView2 GUI.
+- Added safe replacement, cancellation, SHA-256 verification, and automatic resume.
+- Added preservation of Windows security information and filesystem metadata.
+- Fixed normal copy failures on filesystems without extended-attribute support.
+- Added adaptive parallelism and specialized local/SMB/cloud copy paths.
+- Added persistent English/Japanese switching with the QDB-style language button.
+- Adopted the common Quick application distribution layout.

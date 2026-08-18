@@ -1,4 +1,1 @@
-pywin32
-PySide6
-pytest
-nuitka
+# Native build scripts use only the Python standard library.
