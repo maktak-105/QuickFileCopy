@@ -1,31 +1,33 @@
-# QuickFileCopy バージョン情報
+# QuickFileCopy Version Information
 
-## バージョン
+[日本語版 about_jp.md](about_jp.md)
 
-Ver. v0.1.0（開発プレビュー）
+## Version
 
-## 対応OS
+Ver. v0.1.0 (Development Preview)
+
+## Supported Operating Systems
 
 Windows 10 / 11 (64-bit)
 
-## 表示言語
+## Display Languages
 
-- GUI: 日本語 / English（画面右上のQDB形式トグルで即時切替）
-- リポジトリ文書・配布説明書: 日本語 / English
-- 選択言語はWebView2のローカル設定に保存し、再起動後も維持
+- GUI: Japanese / English, switched immediately with the QDB-style toggle in the upper-right corner
+- Repository and distribution documentation: Japanese / English
+- The selected language is stored in WebView2 local settings and retained after restart
 
-## 技術スタック
+## Technology Stack
 
 - C++20 / MinGW-w64 / WinLibs MCF UCRT
 - Win32 API
 - Microsoft Edge WebView2
-- HTML / CSS / バニラJavaScript
-- Python標準ライブラリ（ビルドスクリプトのみ）
+- HTML / CSS / vanilla JavaScript
+- Python standard library (build scripts only)
 
-主なWindows API: `CopyFileExW`, `MoveFileExW`, `SetFileValidData`, `ReadEncryptedFileRaw`, `WriteEncryptedFileRaw`, `DeviceIoControl`, BCrypt SHA-256, Windows Security API。
+Primary Windows APIs: `CopyFileExW`, `MoveFileExW`, `SetFileValidData`, `ReadEncryptedFileRaw`, `WriteEncryptedFileRaw`, `DeviceIoControl`, BCrypt SHA-256, and Windows Security APIs.
 
-実行時にPythonやサードパーティC++ランタイムを別途導入する必要はありません。WebView2 Runtimeは必要です。
+Python and third-party C++ runtimes do not need to be installed separately at runtime. The WebView2 Runtime is required.
 
-## 制作者
+## Author
 
 GitHub: maktak-105

@@ -1,119 +1,121 @@
-# QuickFileCopy 仕様書
+# QuickFileCopy Specification
 
-## 1. アプリ概要
+[日本語版 spec_jp.md](spec_jp.md)
 
-- 名称: QuickFileCopy（高速ファイルコピー）
-- 目的: Windows上のファイル・フォルダーを少ない設定で高速かつ安全にコピーする
-- 対象OS: Windows 10 / 11 (64-bit)
-- 実装: C++20 (MinGW-w64) + Win32 + WebView2 + HTML/CSS/バニラJavaScript
-- バージョン: v0.1.0
-- 配布形態: フラット構成のZIP
+## 1. Application Overview
 
-## 2. アーキテクチャ
+- Name: QuickFileCopy
+- Purpose: Copy files and folders quickly and safely on Windows with minimal configuration
+- Supported OS: Windows 10 / 11 (64-bit)
+- Implementation: C++20 (MinGW-w64) + Win32 + WebView2 + HTML/CSS/vanilla JavaScript
+- Version: v0.1.0
+- Distribution: Flat ZIP archive
+
+## 2. Architecture
 
 ```text
 [templates/index.html]
         ↓ bundle_html.py
-[EXE埋め込みHTML] ←WebMessage(JSON)→ [webview_main.cpp]
-                                           ↓
-                                    [copy_engine.cpp]
-                                           ↑
-                                      [main_cli.cpp]
+[HTML embedded in EXE] ←WebMessage(JSON)→ [webview_main.cpp]
+                                                ↓
+                                         [copy_engine.cpp]
+                                                ↑
+                                           [main_cli.cpp]
 ```
 
-- `copy_engine.cpp`: GUI非依存の走査、判定、コピー、検証、メタデータ保持
-- `webview_main.cpp`: Win32ウィンドウ、WebView2、フォルダー選択、UACワーカー、JSON変換
-- `main_cli.cpp`: 同じコピーエンジンを使用するCLI
-- `templates/index.html`: フレームワーク非依存の自己完結UI。ビルド時にEXEリソースへ格納
+- `copy_engine.cpp`: GUI-independent scanning, decision, copy, verification, and metadata preservation
+- `webview_main.cpp`: Win32 window, WebView2, folder selection, UAC worker, and JSON conversion
+- `main_cli.cpp`: CLI using the same copy engine
+- `templates/index.html`: Framework-independent, self-contained UI embedded in the EXE at build time
 
-## 3. 画面構成
+## 3. Screen Layout
 
-| 領域 | 内容 |
+| Area | Contents |
 | --- | --- |
-| ヘッダー | アプリ名、モード、配置、競合ポリシー、日英言語切替 |
-| コピー設定 | 複数コピー元、コピー先、履歴、開始・キャンセル |
-| 転送サマリー | 検出、コピー済み、再開、スキップ、エラー件数 |
-| 進捗 | 容量%、ファイル件数%、速度、経過時間、処理中パス |
+| Header | Application name, mode, layout, conflict policy, and language toggle |
+| Copy settings | Multiple sources, destination, history, start, and cancel |
+| Transfer summary | Found, copied, resumed, skipped, and error counts |
+| Progress | Byte percentage, file percentage, speed, elapsed time, and current path |
 
-## 4. コピーモード
+## 4. Copy Modes
 
-| モード | 動作 |
+| Mode | Behavior |
 | --- | --- |
-| 高速 | 標準コピー。EAは要求せず、必要に応じ大容量ローカルファイルを非バッファ化 |
-| 検証 | 標準コピー後にコピー元と一時コピーのSHA-256を比較 |
-| 完全保持 | 管理者ワーカーでACL/SACL、EA、ハードリンクなどを保持 |
-| 完全保持＋検証 | 完全保持にSHA-256検証を追加 |
+| Fast | Standard copy without requesting EAs; uses unbuffered I/O for eligible large local files |
+| Verify | Standard copy followed by SHA-256 comparison of the source and temporary copy |
+| Preserve | Uses an elevated worker to preserve ACL/SACL, EAs, hard links, and other metadata |
+| Preserve + verify | Adds SHA-256 verification to Preserve mode |
 
-## 5. 配置と競合
+## 5. Layout and Conflict Policies
 
-- `contents`: コピー元フォルダーの中身をコピー先へ直接マージする。
-- `folder`: コピー先の下にコピー元フォルダー名を作る。
-- `skip`: 同名のコピー先が存在すれば処理しない。
-- `overwrite`: 同名のコピー先を安全な一時ファイルから置換する。
-- `newer`: コピー元の更新時刻が新しい場合だけ置換する。
+- `contents`: Merge the contents of the source folder directly into the destination.
+- `folder`: Create the source folder name under the destination.
+- `skip`: Do not process an item when a destination with the same name exists.
+- `overwrite`: Safely replace an existing destination using a temporary file.
+- `newer`: Replace only when the source has a newer modification time.
 
-## 6. WebMessageプロトコル
+## 6. WebMessage Protocol
 
-すべてのメッセージは`version: 1`を持つJSONオブジェクトとする。
+Every message is a JSON object with `version: 1`.
 
 ### JavaScript → native
 
-| command | 主な値 | 説明 |
+| command | Main values | Description |
 | --- | --- | --- |
-| `pickSource` | なし | 複数選択可能なコピー元ダイアログ |
-| `pickDestination` | なし | コピー先ダイアログ |
-| `setSource` | `path` | 履歴からコピー元を設定 |
-| `setDestination` | `path` | 履歴からコピー先を設定 |
-| `startCopy` | `policy`, `mode`, `layout` | コピー開始 |
-| `cancel` | なし | 実行中セッションまたは特権ワーカーをキャンセル |
-| `getState` | なし | 現在の選択状態を要求 |
+| `pickSource` | none | Opens a source-folder dialog with multiple selection |
+| `pickDestination` | none | Opens the destination-folder dialog |
+| `setSource` | `path` | Selects a source from history |
+| `setDestination` | `path` | Selects a destination from history |
+| `startCopy` | `policy`, `mode`, `layout` | Starts copying |
+| `cancel` | none | Cancels the active session or privileged worker |
+| `getState` | none | Requests the current selection state |
 
 ### native → JavaScript
 
-| event | 説明 |
+| event | Description |
 | --- | --- |
-| `selection` | コピー元とコピー先の現在値 |
-| `started` | コピー開始 |
-| `progress` | 容量、件数、速度、経過時間、現在パス |
-| `completed` | 完了、キャンセル、エラー詳細 |
-| `error` | コピー開始前または特権ワーカー起動の失敗 |
+| `selection` | Current source and destination values |
+| `started` | Copy started |
+| `progress` | Bytes, counts, speed, elapsed time, and current path |
+| `completed` | Completion, cancellation, and error details |
+| `error` | Failure before copying or while starting the privileged worker |
 
-## 7. 安全性
+## 7. Safety
 
-- 通常ファイルはコピー先と同じディレクトリの`.qfc-<pid>-<id>.part`へ書く。
-- コピー、任意の検証、メタデータ保持が完了してから`MoveFileExW`で置換する。
-- キャンセル・失敗時は未完成の一時ファイルを削除する。
-- 再開ジャーナルは確定済みファイルだけをサイズと更新時刻で再検証して再利用する。
-- 特権事前確保した一時ファイルは、完成まで実行ユーザーとSYSTEMだけがアクセスできるDACLにする。
+- Regular files are written to `.qfc-<pid>-<id>.part` in the destination directory.
+- `MoveFileExW` replaces the destination only after copy, optional verification, and metadata preservation complete.
+- Incomplete temporary files are deleted after cancellation or failure.
+- The resume journal reuses only committed files after validating their size and modification time.
+- Until completion, a privileged preallocated temporary file has a DACL that permits only the current user and SYSTEM.
 
-## 8. メタデータ保持
+## 8. Metadata Preservation
 
 - ADS: `CopyFileExW`
-- EA: 完全保持モードで`NtQueryEaFile` / `NtSetEaFile`を使用。コピー元のファイルシステムがEA非対応なら「EAなし」としてコピーを継続する。
+- EA: Preserve mode uses `NtQueryEaFile` / `NtSetEaFile`. If the source filesystem does not support EAs, copying continues as though the source has no EAs.
 - EFS: `ReadEncryptedFileRaw` / `WriteEncryptedFileRaw`
-- ACL/所有者/グループ/SACL: Windows Security API
-- リパースポイント: `FSCTL_GET_REPARSE_POINT` / `FSCTL_SET_REPARSE_POINT`
-- スパース: 割当範囲を問い合わせて未割当領域を再作成
-- 圧縮: `FSCTL_SET_COMPRESSION`
-- ハードリンク: ファイルIDを基にコピー先のリンク関係を再現
+- ACL/owner/group/SACL: Windows Security API
+- Reparse points: `FSCTL_GET_REPARSE_POINT` / `FSCTL_SET_REPARSE_POINT`
+- Sparse files: Queries allocated ranges and recreates unallocated regions
+- Compression: `FSCTL_SET_COMPRESSION`
+- Hard links: Recreates destination link relationships using file IDs
 
-## 9. 性能方針
+## 9. Performance Policy
 
-- 走査とコピーを有界キューで並行実行する。
-- 自動並列数はローカル最大16、クラウド属性/リパースマウント12、UNC/SMB 8。
-- 512 MiB以上のローカル通常ファイルは非バッファコピーを要求する。
-- 完全保持モードで特権を取得できる場合だけ、対象ローカル通常ファイルを事前確保する。
-- スパース、圧縮、EFS、ADS、リパース、クラウド、ネットワークは事前確保の対象外とする。
+- Scanning and copying run concurrently through a bounded queue.
+- Automatic parallelism is up to 16 workers for local storage, 12 for cloud-attribute/reparse mounts, and 8 for UNC/SMB.
+- Eligible regular local files of 512 MiB or larger request unbuffered copying.
+- Privileged preallocation is used only for eligible regular local files when Preserve mode obtains the required privilege.
+- Sparse, compressed, EFS, ADS, reparse-point, cloud, and network files are excluded from privileged preallocation.
 
-## 10. 表示言語
+## 10. Display Languages
 
-- 日本語とEnglishを画面右上の`🌐 English` / `🌐 日本語`ボタンで即時切替する。
-- 静的ラベル、進捗、完了、キャンセル、アプリ側エラーを同じ言語へ統一する。
-- 選択言語を`localStorage`の`qfc.preferences.lang`へ保存する。
-- Windows API由来の詳細エラー本文は、診断情報を失わないためOSが返した原文を表示する。
+- The `🌐 English` / `🌐 日本語` button in the upper-right corner switches immediately between Japanese and English.
+- Static labels, progress, completion, cancellation, and application errors use the selected language.
+- The selected language is stored in the `qfc.preferences` object in `localStorage`.
+- Detailed Windows API errors remain in the text returned by the operating system so diagnostic information is retained.
 
-## 11. 既知の制限
+## 11. Known Limitations
 
-- コード署名は未実施。
-- 特権事前確保の効果は保存先が高速なローカルストレージの場合に限られる。
-- 外部の`index.html`は配布しないため、UI差し替えには再ビルドが必要。
+- The binaries are not code-signed.
+- Privileged preallocation improves performance only when the destination is fast local storage.
+- Because an external `index.html` is not distributed, replacing the UI requires rebuilding the executable.
