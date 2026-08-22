@@ -81,7 +81,7 @@ The default WebView2 SDK root is `C:\tools\webview2\build\native`. Override it w
 Build outputs are written to `dist\binary`. Run the smoke tests after building:
 
 ```powershell
-python core\native\tests\native_smoke.py
+python python\tests\native_smoke.py
 ```
 
 Detailed specifications and build notes are in [`document/`](document/).
@@ -89,14 +89,15 @@ Detailed specifications and build notes are in [`document/`](document/).
 ## Project layout
 
 ```text
-core/native/       C++ engine, GUI host, CLI, resources, and native tests
+core/native/       C++ engine, GUI host, CLI, and resources
+python/prototype/  archived Python/PySide6 prototype
+python/tests/      native CLI smoke and benchmark runners
+python/benchmark/  historical Python prototype measurements
 templates/         self-contained WebView2 development UI
 static/            reserved CSS/JS/image source area
 assets/            icon sources and future public screenshots
 document/          specification, environment, and version information
 plans/             dated implementation plans and results
-benchmark/         reproducible benchmarks and measurement notes
-prototype/python/  archived Python/PySide6 prototype
 dist/binary/       generated binaries, excluded from source control
 dist/documents/    user-facing distribution documents
 ```

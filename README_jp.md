@@ -81,7 +81,7 @@ WebView2 SDKの既定ルートは`C:\tools\webview2\build\native`です。別の
 成果物は`dist\binary`へ出力されます。ビルド後のスモークテスト:
 
 ```powershell
-python core\native\tests\native_smoke.py
+python python\tests\native_smoke.py
 ```
 
 詳しい仕様とビルド情報は[`document/`](document/)にあります。
@@ -89,14 +89,15 @@ python core\native\tests\native_smoke.py
 ## フォルダ構成
 
 ```text
-core/native/       C++エンジン、GUIホスト、CLI、リソース、ネイティブテスト
+core/native/       C++エンジン、GUIホスト、CLI、リソース
+python/prototype/  旧Python/PySide6プロトタイプ
+python/tests/      ネイティブCLIのスモークとベンチマーク
+python/benchmark/  旧Python試作の計測記録
 templates/         自己完結WebView2開発用UI
 static/            CSS/JS/画像を分離する場合の配置先
 assets/            アイコン原本と今後の公開用スクリーンショット
 document/          仕様、開発環境、バージョン情報
 plans/             日付付きの計画書と実施結果
-benchmark/         再現可能なベンチマークと計測記録
-prototype/python/  旧Python/PySide6プロトタイプ
 dist/binary/       生成バイナリ（ソース管理対象外）
 dist/documents/    配布用ユーザー文書
 ```

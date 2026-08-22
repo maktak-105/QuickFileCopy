@@ -65,13 +65,13 @@ An external `index.html` or engine DLL is not required.
 ## Tests
 
 ```powershell
-python core\native\tests\native_smoke.py
+python python\tests\native_smoke.py
 ```
 
 Benchmark:
 
 ```powershell
-python core\native\tests\benchmark_native.py --profile small --destination-root D:\qfc-bench --workers 1,4,8,16
+python python\tests\benchmark_native.py --profile small --destination-root D:\qfc-bench --workers 1,4,8,16
 ```
 
 ## Troubleshooting
@@ -91,13 +91,14 @@ python core\native\tests\benchmark_native.py --profile small --destination-root 
 core/native/include/qfc/  Public engine headers
 core/native/src/          Engine, WebView2 host, and CLI
 core/native/resources/    RC files and icon/HTML resource definitions
-core/native/tests/        Smoke tests and benchmarks
+python/prototype/         Legacy Python prototype
+python/tests/             Native CLI smoke tests and benchmarks
+python/benchmark/         Historical Python prototype measurements
 templates/                WebView2 UI used during development
 static/                   Future location for separated CSS/JS/images
 assets/                   Original icons and public images
 document/                 Developer documentation
 plans/                    Plans and implementation results
-prototype/python/         Legacy Python prototype
 dist/binary/              Generated binaries
 dist/documents/           Distribution documentation
 ```
