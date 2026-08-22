@@ -10,15 +10,13 @@ src/copy_engine.cpp        scanner, queue, copy paths, verification, metadata
 src/webview_main.cpp       Win32 window, WebView2 host, UAC worker, WebMessage
 src/main_cli.cpp            command-line application
 resources/                  resource script, VERSIONINFO, generated embedded HTML
-tests/native_smoke.py       functional smoke tests
-tests/benchmark_native.py   reproducible performance runner
 ```
 
-The standard build entry point is the repository-root `build.bat` or `build_native.py`.
+Python smoke tests live in `python/tests/`. The standard build entry point is the repository-root `build.bat` or `build_native.py`.
 
 ```powershell
 build.bat
-python core\native\tests\native_smoke.py
+python python\tests\native_smoke.py
 ```
 
 Outputs:

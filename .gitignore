@@ -26,13 +26,13 @@ dist/binary/*
 dist/*.zip
 
 # Benchmark data generated on local machines
-benchmark/testdata/
-benchmark/**/results/*.json
+python/benchmark/testdata/
+python/benchmark/**/results/*.json
 
 # Prototype build outputs
-prototype/python/*.dist/
-prototype/python/*.build/
-prototype/python/*.onefile-build/
+python/prototype/*.dist/
+python/prototype/*.build/
+python/prototype/*.onefile-build/
 
 # Reference repositories and logs
 reference/

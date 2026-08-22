@@ -12,7 +12,7 @@ import time
 import uuid
 
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[2]
 QFC = ROOT / "dist" / "binary" / "QuickFileCopy_cli.exe"
 ELAPSED = re.compile(r"elapsed:\s+([0-9.]+)\s+s")
 

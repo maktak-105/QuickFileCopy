@@ -65,13 +65,13 @@ build.bat
 ## テスト
 
 ```powershell
-python core\native\tests\native_smoke.py
+python python\tests\native_smoke.py
 ```
 
 性能測定:
 
 ```powershell
-python core\native\tests\benchmark_native.py --profile small --destination-root D:\qfc-bench --workers 1,4,8,16
+python python\tests\benchmark_native.py --profile small --destination-root D:\qfc-bench --workers 1,4,8,16
 ```
 
 ## トラブルシューティング
@@ -91,13 +91,14 @@ python core\native\tests\benchmark_native.py --profile small --destination-root 
 core/native/include/qfc/  公開エンジンヘッダー
 core/native/src/          エンジン、WebView2ホスト、CLI
 core/native/resources/    RC、アイコン/HTMLのリソース定義
-core/native/tests/        スモークテストとベンチマーク
+python/prototype/         旧Pythonプロトタイプ
+python/tests/             ネイティブCLIのスモークとベンチマーク
+python/benchmark/         旧Python試作の計測記録
 templates/                開発用WebView2 UI
 static/                   将来のCSS/JS/画像分離先
 assets/                   アイコン原本・公開用画像
 document/                 開発者向け文書
 plans/                    計画・実施結果
-prototype/python/         旧Pythonプロトタイプ
 dist/binary/              生成バイナリ
 dist/documents/           配布同梱文書
 ```
