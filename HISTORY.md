@@ -7,6 +7,13 @@
 - Second digit: bug fixes
 - Third digit: documentation and other changes
 
+## 1.0.0 (2026-08-22)
+
+### Distribution
+
+- First public release of the native GUI and CLI.
+- GitHub Actions builds `QuickFileCopy-binary.zip` from a `v*` tag. The ZIP is not stored in the repository.
+
 ## 0.1.0 (2026-08-18)
 
 ### Engine

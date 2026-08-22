@@ -8,7 +8,7 @@
 - Purpose: Copy files and folders quickly and safely on Windows with minimal configuration
 - Supported OS: Windows 10 / 11 (64-bit)
 - Implementation: C++20 (MinGW-w64) + Win32 + WebView2 + HTML/CSS/vanilla JavaScript
-- Version: v0.1.0
+- Version: v1.0.0
 - Distribution: Flat ZIP archive
 
 ## 2. Architecture
