@@ -4,8 +4,8 @@ IDI_APP_ICON ICON "@QFC_ICON_PATH@"
 IDR_APP_HTML RCDATA "@QFC_HTML_PATH@"
 
 1 VERSIONINFO
- FILEVERSION 0,1,0,0
- PRODUCTVERSION 0,1,0,0
+ FILEVERSION 1,0,0,0
+ PRODUCTVERSION 1,0,0,0
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS 0x40004L
@@ -18,12 +18,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "QuickFileCopy Project\0"
       VALUE "FileDescription", "QuickFileCopy - Native High-Speed File Copy\0"
-      VALUE "FileVersion", "0.1.0\0"
+      VALUE "FileVersion", "1.0.0\0"
       VALUE "InternalName", "QuickFileCopy\0"
       VALUE "LegalCopyright", "Copyright (C) 2026 QuickFileCopy contributors\0"
       VALUE "OriginalFilename", "QuickFileCopy.exe\0"
       VALUE "ProductName", "QuickFileCopy\0"
-      VALUE "ProductVersion", "0.1.0\0"
+      VALUE "ProductVersion", "1.0.0\0"
     END
   END
   BLOCK "VarFileInfo"

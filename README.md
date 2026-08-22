@@ -3,9 +3,9 @@
 
 QuickFileCopy is a native high-speed file copy application for Windows 10 and 11. It focuses on a compact workflow, visible byte/file progress, safe replacement, and Windows metadata preservation without requiring Python at runtime.
 
-## Current status
+Version: **v1.0.0**
 
-Version 0.1.0 is a development preview. The GUI and documentation support English and Japanese; the QDB-style language button keeps the selected language across restarts.
+The GUI and documentation support English and Japanese; the QDB-style language button keeps the selected language across restarts.
 
 <p align="center">
   <img src="assets/QuickFileCopy-gui-en.png" alt="QuickFileCopy English GUI" width="720">
@@ -25,9 +25,15 @@ Version 0.1.0 is a development preview. The GUI and documentation support Englis
 - SMB compression requests, adaptive worker counts, and unbuffered large local copies
 - Privileged preallocation for eligible local files of 512 MiB or larger in complete-preservation modes
 
-## Binary layout
+## Using the binary release
 
-The release ZIP uses one flat directory:
+If you only want to run the app, download the ZIP from GitHub Releases. GitHub Actions builds `QuickFileCopy-binary.zip` on a `v*` tag; the ZIP is not stored in this repository.
+
+- [Latest releases](https://github.com/maktak-105/QuickFileCopy/releases)
+- [v1.0.0](https://github.com/maktak-105/QuickFileCopy/releases/tag/v1.0.0)
+- [Direct download of QuickFileCopy-binary.zip](https://github.com/maktak-105/QuickFileCopy/releases/download/v1.0.0/QuickFileCopy-binary.zip)
+
+Extract every file into the same folder and run `QuickFileCopy.exe`.
 
 - `QuickFileCopy.exe` - WebView2 GUI
 - `QuickFileCopy_cli.exe` - command-line interface
@@ -37,13 +43,6 @@ The release ZIP uses one flat directory:
 - `LICENSE.txt` / `LICENSE_jp.txt` - license files
 
 The GUI HTML is embedded in `QuickFileCopy.exe`; an external `index.html` is not required.
-
-SHA-256 of the current v0.1.0 development build:
-
-```text
-DD5CB93CF84CD6FE5D0DF78DC1A640B3CF97EF4E153989CC8F39A7EF681651E7  QuickFileCopy.exe
-5CAE1046B51B5D60EB929561294E3E2F526C62CAA97A828BA9B326F693E08843  QuickFileCopy_cli.exe
-```
 
 ## GUI usage
 

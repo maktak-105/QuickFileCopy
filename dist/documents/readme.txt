@@ -1,5 +1,5 @@
 QuickFileCopy - Native high-speed file copy for Windows
-Distribution package  v0.1.0 development preview
+Distribution package  v1.0.0
 
 GitHub
 ------

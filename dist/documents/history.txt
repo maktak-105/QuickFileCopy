@@ -1,5 +1,9 @@
 QuickFileCopy - Change log
 
+v1.0.0 (2026-08-22)
+- First public release of the native GUI and CLI.
+- GitHub Actions builds the distribution ZIP from a v* tag.
+
 v0.1.0 (2026-08-18)
 - Added the native C++ copy engine and compact WebView2 GUI.
 - Added safe replacement, cancellation, SHA-256 verification, and automatic resume.

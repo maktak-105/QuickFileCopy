@@ -3,9 +3,9 @@
 
 QuickFileCopyはWindows 10/11向けのネイティブ高速ファイルコピーアプリです。簡潔な操作、容量とファイル件数の分かる進捗、安全な置換、Windows固有メタデータの保持を重視し、実行時にPythonを必要としません。
 
-## 現在の状態
+バージョン: **v1.0.0**
 
-バージョン0.1.0は開発プレビューです。GUIと文書は日本語／Englishに対応し、QDB形式の言語ボタンで切り替えた設定は再起動後も維持されます。
+GUIと文書は日本語／Englishに対応し、QDB形式の言語ボタンで切り替えた設定は再起動後も維持されます。
 
 <p align="center">
   <img src="assets/QuickFileCopy-gui-ja.png" alt="QuickFileCopy 日本語GUI" width="720">
@@ -25,9 +25,15 @@ QuickFileCopyはWindows 10/11向けのネイティブ高速ファイルコピー
 - SMB圧縮要求、保存先に応じた並列数、大容量ローカルコピーの非バッファ化
 - 完全保持モードにおける512 MiB以上の対象ローカルファイルの特権事前確保
 
-## 配布ファイル
+## 配布版を使う
 
-配布ZIPは次のファイルを同じ階層へ置くフラット構成です。
+実行だけなら GitHub Releases の ZIP を使います。`v*` タグで GitHub Actions が `QuickFileCopy-binary.zip` を作ります。ZIP はリポジトリには置きません。
+
+- [最新版の配布ページ](https://github.com/maktak-105/QuickFileCopy/releases)
+- [v1.0.0](https://github.com/maktak-105/QuickFileCopy/releases/tag/v1.0.0)
+- [QuickFileCopy-binary.zipを直接ダウンロード](https://github.com/maktak-105/QuickFileCopy/releases/download/v1.0.0/QuickFileCopy-binary.zip)
+
+すべてのファイルを同じフォルダへ展開して `QuickFileCopy.exe` を実行します。
 
 - `QuickFileCopy.exe` - WebView2 GUI版
 - `QuickFileCopy_cli.exe` - CLI版
@@ -37,13 +43,6 @@ QuickFileCopyはWindows 10/11向けのネイティブ高速ファイルコピー
 - `LICENSE.txt` / `LICENSE_jp.txt` - ライセンス
 
 GUIのHTMLは`QuickFileCopy.exe`へ埋め込まれるため、外部の`index.html`は不要です。
-
-現在のv0.1.0開発ビルドのSHA-256:
-
-```text
-DD5CB93CF84CD6FE5D0DF78DC1A640B3CF97EF4E153989CC8F39A7EF681651E7  QuickFileCopy.exe
-5CAE1046B51B5D60EB929561294E3E2F526C62CAA97A828BA9B326F693E08843  QuickFileCopy_cli.exe
-```
 
 ## GUIの使い方
 
