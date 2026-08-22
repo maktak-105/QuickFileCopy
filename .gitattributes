@@ -1,0 +1,4 @@
+# Shipped product is C++ / WebView2. Keep the Python prototype and legacy
+# benchmarks in the repository, but exclude them from GitHub Linguist stats.
+prototype/** linguist-vendored
+benchmark/legacy_python/** linguist-vendored
