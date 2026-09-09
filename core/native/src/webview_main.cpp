@@ -734,6 +734,15 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
             if (g_webview && json) g_webview->PostWebMessageAsJson(json->c_str());
             return 0;
         }
+        case WM_DPICHANGED: {
+            const RECT* suggested = reinterpret_cast<const RECT*>(lparam);
+            SetWindowPos(
+                window, nullptr, suggested->left, suggested->top,
+                suggested->right - suggested->left, suggested->bottom - suggested->top,
+                SWP_NOZORDER | SWP_NOACTIVATE
+            );
+            return 0;
+        }
         case WM_DESTROY:
             if (const HANDLE privileged_pipe = g_privileged_pipe.load(std::memory_order_acquire);
                 privileged_pipe != INVALID_HANDLE_VALUE) {
@@ -789,9 +798,11 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int show) {
     window_class.hIconSm = window_class.hIcon;
     if (!RegisterClassExW(&window_class)) return 1;
 
+    const UINT dpi = GetDpiForSystem();
+    const int window_height = MulDiv(530, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
     g_window = CreateWindowExW(
         0, kWindowClass, L"QuickFileCopy - Native High-Speed File Copy",
-        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 980, 660,
+        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 980, window_height,
         nullptr, nullptr, instance, nullptr
     );
     if (!g_window) return 1;
