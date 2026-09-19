@@ -42,6 +42,14 @@ Extract every file into the same folder and run `QuickFileCopy.exe`.
 - `history.txt` / `history_jp.txt` - change log
 - `LICENSE.txt` / `LICENSE_jp.txt` - license files
 
+### Integrity verification (SHA-256)
+
+Official SHA-256 checksums for the distribution ZIP and binaries are automatically computed during the CI (GitHub Actions) build and published as `SHA256SUMS.txt` on each release page. Verify the downloaded package with PowerShell:
+
+```powershell
+Get-FileHash .\QuickFileCopy-binary.zip -Algorithm SHA256
+```
+
 The GUI HTML is embedded in `QuickFileCopy.exe`; an external `index.html` is not required.
 
 ## GUI usage
@@ -57,9 +65,9 @@ Complete-preservation modes launch a separate elevated worker through UAC. The m
 ## CLI usage
 
 ```powershell
-.\dist\binary\QuickFileCopy_cli.exe --help
-.\dist\binary\QuickFileCopy_cli.exe copy C:\Source D:\Backup --contents --policy newer
-.\dist\binary\QuickFileCopy_cli.exe copy C:\Source D:\Backup --folder --policy overwrite --verify
+.\dist\QuickFileCopy_cli.exe --help
+.\dist\QuickFileCopy_cli.exe copy C:\Source D:\Backup --contents --policy newer
+.\dist\QuickFileCopy_cli.exe copy C:\Source D:\Backup --folder --policy overwrite --verify
 ```
 
 ## Build
@@ -73,33 +81,37 @@ Requirements:
 
 ```powershell
 winget install --id BrechtSanders.WinLibs.MCF.UCRT --exact --source winget
-build.bat
+scripts\build.bat
 ```
 
 The default WebView2 SDK root is `C:\tools\webview2\build\native`. Override it with `WEBVIEW2_ROOT`, `WEBVIEW2_INCLUDE`, or `WEBVIEW2_LOADER`.
 
-Build outputs are written to `dist\binary`. Run the smoke tests after building:
+Build outputs are written to `dist/`. Run the smoke tests after building:
 
 ```powershell
-python python\tests\native_smoke.py
+python proto\tests\native_smoke.py
 ```
 
-Detailed specifications and build notes are in [`document/`](document/).
+Detailed specifications and build notes are in [`docs/`](docs/).
 
 ## Project layout
 
 ```text
-core/native/       C++ engine, GUI host, CLI, and resources
-python/prototype/  archived Python/PySide6 prototype
-python/tests/      native CLI smoke and benchmark runners
-python/benchmark/  historical Python prototype measurements
-templates/         self-contained WebView2 development UI
-static/            reserved CSS/JS/image source area
-assets/            icon sources and future public screenshots
-document/          specification, environment, and version information
-plans/             dated implementation plans and results
-dist/binary/       generated binaries, excluded from source control
-dist/documents/    user-facing distribution documents
+QuickFileCopy/
+├── src/
+│   ├── app/              GUI host & Windows resources (main_gui.cpp, .rc, .ico, resource.h)
+│   ├── cli/              CLI entry point (main_cli.cpp)
+│   ├── engine/           Copy engine and qfc/ header (copy_engine.cpp, qfc/copy_engine.h)
+│   └── ui/               UI source files (index.html, css/, js/, img/)
+├── proto/
+│   ├── prototype/        archived Python/PySide6 prototype
+│   ├── tests/            native CLI smoke and benchmark runners
+│   └── benchmark/        historical Python prototype measurements
+├── scripts/              build.py, build.bat, bundle_html.py
+├── docs/                 specification, environment, and version information
+│   └── distribution/     user-facing distribution documents
+├── dist/                 generated binaries, excluded from source control (except .gitkeep)
+└── .github/workflows/    CI and release workflows
 ```
 
 ## License and disclaimer

@@ -43,10 +43,12 @@ QuickFileCopy_cli.exe --help
 - history.txt / history_jp.txt - 更新履歴
 - LICENSE.txt / LICENSE_jp.txt - MIT License
 
-SHA-256
--------
-DD5CB93CF84CD6FE5D0DF78DC1A640B3CF97EF4E153989CC8F39A7EF681651E7  QuickFileCopy.exe
-5CAE1046B51B5D60EB929561294E3E2F526C62CAA97A828BA9B326F693E08843  QuickFileCopy_cli.exe
+完全性検証（SHA-256）
+---------------------
+配布用ZIPおよびバイナリの公式SHA-256ハッシュ値はCIビルド時に自動計算され、
+GitHub Releasesの各リリースに SHA256SUMS.txt として添付・公開されています。
+PowerShellでダウンロードファイルの整合性を確認できます:
+  Get-FileHash .\QuickFileCopy-binary.zip -Algorithm SHA256
 
 ライセンス
 ----------

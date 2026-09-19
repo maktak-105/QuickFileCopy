@@ -37,24 +37,24 @@ jobs:
       - name: Build and test
         shell: pwsh
         run: |
-          python build_native.py
+          python scripts/build.py
           if ($LASTEXITCODE -ne 0) { throw 'Native build failed' }
-          python core\native\tests\native_smoke.py
+          python proto/tests/native_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Smoke tests failed' }
 
       - name: Package flat distribution
         shell: pwsh
         run: |
           $files = @(
-            'dist/binary/QuickFileCopy.exe',
-            'dist/binary/QuickFileCopy_cli.exe',
-            'dist/binary/WebView2Loader.dll',
-            'dist/documents/readme.txt',
-            'dist/documents/readme_jp.txt',
-            'dist/documents/history.txt',
-            'dist/documents/history_jp.txt',
-            'dist/documents/LICENSE.txt',
-            'dist/documents/LICENSE_jp.txt'
+            'dist/QuickFileCopy.exe',
+            'dist/QuickFileCopy_cli.exe',
+            'dist/WebView2Loader.dll',
+            'docs/distribution/readme.txt',
+            'docs/distribution/readme_jp.txt',
+            'docs/distribution/history.txt',
+            'docs/distribution/history_jp.txt',
+            'docs/distribution/LICENSE.txt',
+            'docs/distribution/LICENSE_jp.txt'
           )
           foreach ($file in $files) {
             if (!(Test-Path -LiteralPath $file)) { throw "Missing distribution file: $file" }
@@ -64,12 +64,34 @@ jobs:
           foreach ($file in $files) { Copy-Item -LiteralPath $file -Destination $staging -Force }
           Compress-Archive -Path (Join-Path $staging '*') -DestinationPath 'QuickFileCopy-binary.zip' -Force
 
+      - name: Generate SHA-256 checksums
+        shell: pwsh
+        run: |
+          $checksumFile = Join-Path $env:GITHUB_WORKSPACE 'SHA256SUMS.txt'
+          $lines = @()
+          $zipPath = Join-Path $env:GITHUB_WORKSPACE 'QuickFileCopy-binary.zip'
+          $zipHash = (Get-FileHash -Algorithm SHA256 -Path $zipPath).Hash.ToUpper()
+          $lines += "$zipHash  QuickFileCopy-binary.zip"
+          $lines += ""
+          $lines += "# Binaries inside archive:"
+          $binFiles = @('dist/QuickFileCopy.exe', 'dist/QuickFileCopy_cli.exe', 'dist/WebView2Loader.dll')
+          foreach ($f in $binFiles) {
+            if (Test-Path -LiteralPath $f) {
+              $h = (Get-FileHash -Algorithm SHA256 -Path $f).Hash.ToUpper()
+              $name = Split-Path -Leaf $f
+              $lines += "$h  $name"
+            }
+          }
+          $lines | Set-Content -Path $checksumFile -Encoding utf8
+
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          files: QuickFileCopy-binary.zip
+          files: |
+            QuickFileCopy-binary.zip
+            SHA256SUMS.txt
           overwrite_files: true
           generate_release_notes: true
           body: |

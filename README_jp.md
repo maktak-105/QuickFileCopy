@@ -42,6 +42,14 @@ GUIと文書は日本語／Englishに対応し、QDB形式の言語ボタンで�
 - `history.txt` / `history_jp.txt` - 更新履歴
 - `LICENSE.txt` / `LICENSE_jp.txt` - ライセンス
 
+### 完全性検証 (SHA-256)
+
+配布用 ZIP および各バイナリの公式 SHA-256 ハッシュ値は、CI (GitHub Actions) ビルド時に自動計算され、各リリースページに `SHA256SUMS.txt` として添付・公開されています。PowerShell でダウンロードファイルの完全性を確認できます:
+
+```powershell
+Get-FileHash .\QuickFileCopy-binary.zip -Algorithm SHA256
+```
+
 GUIのHTMLは`QuickFileCopy.exe`へ埋め込まれるため、外部の`index.html`は不要です。
 
 ## GUIの使い方
@@ -57,9 +65,9 @@ GUIのHTMLは`QuickFileCopy.exe`へ埋め込まれるため、外部の`index.ht
 ## CLIの使い方
 
 ```powershell
-.\dist\binary\QuickFileCopy_cli.exe --help
-.\dist\binary\QuickFileCopy_cli.exe copy C:\Source D:\Backup --contents --policy newer
-.\dist\binary\QuickFileCopy_cli.exe copy C:\Source D:\Backup --folder --policy overwrite --verify
+.\dist\QuickFileCopy_cli.exe --help
+.\dist\QuickFileCopy_cli.exe copy C:\Source D:\Backup --contents --policy newer
+.\dist\QuickFileCopy_cli.exe copy C:\Source D:\Backup --folder --policy overwrite --verify
 ```
 
 ## ビルド
@@ -73,33 +81,37 @@ GUIのHTMLは`QuickFileCopy.exe`へ埋め込まれるため、外部の`index.ht
 
 ```powershell
 winget install --id BrechtSanders.WinLibs.MCF.UCRT --exact --source winget
-build.bat
+scripts\build.bat
 ```
 
 WebView2 SDKの既定ルートは`C:\tools\webview2\build\native`です。別の場所を使う場合は`WEBVIEW2_ROOT`、`WEBVIEW2_INCLUDE`、`WEBVIEW2_LOADER`で指定できます。
 
-成果物は`dist\binary`へ出力されます。ビルド後のスモークテスト:
+成果物は`dist/`へ出力されます。ビルド後のスモークテスト:
 
 ```powershell
-python python\tests\native_smoke.py
+python proto\tests\native_smoke.py
 ```
 
-詳しい仕様とビルド情報は[`document/`](document/)にあります。
+詳しい仕様とビルド情報は[`docs/`](docs/)にあります。
 
 ## フォルダ構成
 
 ```text
-core/native/       C++エンジン、GUIホスト、CLI、リソース
-python/prototype/  旧Python/PySide6プロトタイプ
-python/tests/      ネイティブCLIのスモークとベンチマーク
-python/benchmark/  旧Python試作の計測記録
-templates/         自己完結WebView2開発用UI
-static/            CSS/JS/画像を分離する場合の配置先
-assets/            アイコン原本と今後の公開用スクリーンショット
-document/          仕様、開発環境、バージョン情報
-plans/             日付付きの計画書と実施結果
-dist/binary/       生成バイナリ（ソース管理対象外）
-dist/documents/    配布用ユーザー文書
+QuickFileCopy/
+├── src/
+│   ├── app/              GUIホスト & Windowsリソース（main_gui.cpp, .rc, .ico, resource.h）
+│   ├── cli/              CLIエントリーポイント（main_cli.cpp）
+│   ├── engine/           コピーエンジンおよびqfc/ヘッダー（copy_engine.cpp, qfc/copy_engine.h）
+│   └── ui/               UIソース（index.html, css/, js/, img/）
+├── proto/
+│   ├── prototype/        旧Python/PySide6プロトタイプ
+│   ├── tests/            ネイティブCLIのスモークとベンチマーク
+│   └── benchmark/        旧Python試作の計測記録
+├── scripts/              build.py, build.bat, bundle_html.py
+├── docs/                 仕様、開発環境、バージョン情報
+│   └── distribution/     配布用ユーザー文書
+├── dist/                 生成バイナリ（ソース管理対象外、.gitkeepのみ保持）
+└── .github/workflows/    CI / Release ワークフロー
 ```
 
 ## ライセンスと免責
