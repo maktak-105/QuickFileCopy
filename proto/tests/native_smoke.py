@@ -9,7 +9,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-QFC = ROOT / "dist" / "binary" / "QuickFileCopy_cli.exe"
+QFC = ROOT / "dist" / "QuickFileCopy_cli.exe"
 
 
 def digest(path: Path) -> str:

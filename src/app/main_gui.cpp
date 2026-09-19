@@ -9,6 +9,7 @@
 
 #include "qfc/copy_engine.h"
 #include "../resources/resource.h"
+#include "resource.h"
 
 #include <algorithm>
 #include <atomic>

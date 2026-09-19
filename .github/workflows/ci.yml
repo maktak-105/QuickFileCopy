@@ -32,8 +32,8 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: python build_native.py
+        run: python scripts/build.py
 
       - name: Smoke tests
         shell: pwsh
-        run: python core\native\tests\native_smoke.py
+        run: python proto/tests/native_smoke.py

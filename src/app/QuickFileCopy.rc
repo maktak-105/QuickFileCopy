@@ -1,7 +1,9 @@
-#include "@CMAKE_CURRENT_SOURCE_DIR@/resources/resource.h"
+#include "resource.h"
 
-IDI_APP_ICON ICON "@QFC_ICON_PATH@"
-IDR_APP_HTML RCDATA "@QFC_HTML_PATH@"
+IDI_APP_ICON ICON "core/native/resources/QuickFileCopy.ico"
+IDR_APP_HTML RCDATA "core/native/resources/QuickFileCopy.html"
+IDI_APP_ICON ICON "QuickFileCopy.ico"
+IDR_APP_HTML RCDATA "QuickFileCopy.html"
 
 1 VERSIONINFO
  FILEVERSION 1,0,0,0
