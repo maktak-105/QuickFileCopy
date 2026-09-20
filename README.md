@@ -3,7 +3,7 @@
 
 QuickFileCopy is a native high-speed file copy application for Windows 10 and 11. It focuses on a compact workflow, visible byte/file progress, safe replacement, and Windows metadata preservation without requiring Python at runtime.
 
-Version: **v1.0.0**
+Version: **v1.1.0**
 
 The GUI and documentation support English and Japanese; the QDB-style language button keeps the selected language across restarts.
 
@@ -30,8 +30,8 @@ The GUI and documentation support English and Japanese; the QDB-style language b
 If you only want to run the app, download the ZIP from GitHub Releases. GitHub Actions builds `QuickFileCopy-binary.zip` on a `v*` tag; the ZIP is not stored in this repository.
 
 - [Latest releases](https://github.com/maktak-105/QuickFileCopy/releases)
-- [v1.0.0](https://github.com/maktak-105/QuickFileCopy/releases/tag/v1.0.0)
-- [Direct download of QuickFileCopy-binary.zip](https://github.com/maktak-105/QuickFileCopy/releases/download/v1.0.0/QuickFileCopy-binary.zip)
+- [v1.1.0](https://github.com/maktak-105/QuickFileCopy/releases/tag/v1.1.0)
+- [Direct download of QuickFileCopy-binary.zip](https://github.com/maktak-105/QuickFileCopy/releases/download/v1.1.0/QuickFileCopy-binary.zip)
 
 Extract every file into the same folder and run `QuickFileCopy.exe`.
 
@@ -116,7 +116,7 @@ QuickFileCopy/
 
 ## License and disclaimer
 
-MIT License. See [`LICENSE`](LICENSE) and [`dist/documents/LICENSE_jp.txt`](dist/documents/LICENSE_jp.txt).
+MIT License. See [`LICENSE`](LICENSE) and [`docs/distribution/LICENSE_jp.txt`](docs/distribution/LICENSE_jp.txt).
 
 This software is provided as-is. The author assumes no responsibility for data loss, system failure, hardware damage, or other damages. Back up important data and test with non-critical files before use.
 

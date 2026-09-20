@@ -1,7 +1,5 @@
 #include "resource.h"
 
-IDI_APP_ICON ICON "core/native/resources/QuickFileCopy.ico"
-IDR_APP_HTML RCDATA "core/native/resources/QuickFileCopy.html"
 IDI_APP_ICON ICON "QuickFileCopy.ico"
 IDR_APP_HTML RCDATA "QuickFileCopy.html"
 
@@ -20,12 +18,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "QuickFileCopy Project\0"
       VALUE "FileDescription", "QuickFileCopy - Native High-Speed File Copy\0"
-      VALUE "FileVersion", "1.0.0\0"
+      VALUE "FileVersion", "1.1.0\0"
       VALUE "InternalName", "QuickFileCopy\0"
       VALUE "LegalCopyright", "Copyright (C) 2026 QuickFileCopy contributors\0"
       VALUE "OriginalFilename", "QuickFileCopy.exe\0"
       VALUE "ProductName", "QuickFileCopy\0"
-      VALUE "ProductVersion", "1.0.0\0"
+      VALUE "ProductVersion", "1.1.0\0"
     END
   END
   BLOCK "VarFileInfo"

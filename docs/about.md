@@ -4,7 +4,7 @@
 
 ## Version
 
-Ver. v1.0.0
+Ver. v1.1.0
 
 ## Supported Operating Systems
 

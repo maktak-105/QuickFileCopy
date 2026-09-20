@@ -3,7 +3,7 @@
 
 QuickFileCopyはWindows 10/11向けのネイティブ高速ファイルコピーアプリです。簡潔な操作、容量とファイル件数の分かる進捗、安全な置換、Windows固有メタデータの保持を重視し、実行時にPythonを必要としません。
 
-バージョン: **v1.0.0**
+バージョン: **v1.1.0**
 
 GUIと文書は日本語／Englishに対応し、QDB形式の言語ボタンで切り替えた設定は再起動後も維持されます。
 
@@ -30,8 +30,8 @@ GUIと文書は日本語／Englishに対応し、QDB形式の言語ボタンで�
 実行だけなら GitHub Releases の ZIP を使います。`v*` タグで GitHub Actions が `QuickFileCopy-binary.zip` を作ります。ZIP はリポジトリには置きません。
 
 - [最新版の配布ページ](https://github.com/maktak-105/QuickFileCopy/releases)
-- [v1.0.0](https://github.com/maktak-105/QuickFileCopy/releases/tag/v1.0.0)
-- [QuickFileCopy-binary.zipを直接ダウンロード](https://github.com/maktak-105/QuickFileCopy/releases/download/v1.0.0/QuickFileCopy-binary.zip)
+- [v1.1.0](https://github.com/maktak-105/QuickFileCopy/releases/tag/v1.1.0)
+- [QuickFileCopy-binary.zipを直接ダウンロード](https://github.com/maktak-105/QuickFileCopy/releases/download/v1.1.0/QuickFileCopy-binary.zip)
 
 すべてのファイルを同じフォルダへ展開して `QuickFileCopy.exe` を実行します。
 
@@ -116,7 +116,7 @@ QuickFileCopy/
 
 ## ライセンスと免責
 
-MIT Licenseです。[`LICENSE`](LICENSE)および[`dist/documents/LICENSE_jp.txt`](dist/documents/LICENSE_jp.txt)を参照してください。
+MIT Licenseです。[`LICENSE`](LICENSE)および[`docs/distribution/LICENSE_jp.txt`](docs/distribution/LICENSE_jp.txt)を参照してください。
 
 本ソフトウェアは現状有姿で提供されます。データ消失、システム障害、ハードウェア故障、その他の損害について作者は責任を負いません。重要なデータをバックアップし、最初は重要でないファイルで動作確認してください。
 

@@ -19,7 +19,7 @@
 winget install --id BrechtSanders.WinLibs.MCF.UCRT --exact --source winget
 ```
 
-In addition to `PATH`, `build_native.py` searches the standard WinGet package location.
+In addition to `PATH`, `scripts/build.py` searches the standard WinGet package location.
 
 ### WebView2 SDK
 
@@ -40,12 +40,12 @@ Set the following environment variables when necessary:
 
 ```powershell
 cd C:\path\to\QuickFileCopy
-build.bat
+scripts\build.bat
 ```
 
 Internal steps:
 
-1. `bundle_html.py` copies `templates/index.html` into the generated resource file
+1. `scripts/bundle_html.py` copies `src/ui/index.html` to `build/intermediate/QuickFileCopy.html`
 2. `windres` compiles the icon, HTML, and VERSIONINFO into a resource object
 3. Compile the CLI application
 4. Compile the GUI application
@@ -56,22 +56,22 @@ Internal steps:
 
 | File | Description |
 | --- | --- |
-| `dist/binary/QuickFileCopy.exe` | GUI application with embedded HTML |
-| `dist/binary/QuickFileCopy_cli.exe` | CLI application |
-| `dist/binary/WebView2Loader.dll` | WebView2 loader |
+| `dist/QuickFileCopy.exe` | GUI application with embedded HTML |
+| `dist/QuickFileCopy_cli.exe` | CLI application |
+| `dist/WebView2Loader.dll` | WebView2 loader |
 
 An external `index.html` or engine DLL is not required.
 
 ## Tests
 
 ```powershell
-python python\tests\native_smoke.py
+python proto\tests\native_smoke.py
 ```
 
 Benchmark:
 
 ```powershell
-python python\tests\benchmark_native.py --profile small --destination-root D:\qfc-bench --workers 1,4,8,16
+python proto\tests\benchmark_native.py --profile small --destination-root D:\qfc-bench --workers 1,4,8,16
 ```
 
 ## Troubleshooting
@@ -88,17 +88,16 @@ python python\tests\benchmark_native.py --profile small --destination-root D:\qf
 ## Directory Layout
 
 ```text
-core/native/include/qfc/  Public engine headers
-core/native/src/          Engine, WebView2 host, and CLI
-core/native/resources/    RC files and icon/HTML resource definitions
-python/prototype/         Legacy Python prototype
-python/tests/             Native CLI smoke tests and benchmarks
-python/benchmark/         Historical Python prototype measurements
-templates/                WebView2 UI used during development
-static/                   Future location for separated CSS/JS/images
-assets/                   Original icons and public images
-document/                 Developer documentation
-plans/                    Plans and implementation results
-dist/binary/              Generated binaries
-dist/documents/           Distribution documentation
+src/app/                  GUI host, RC resources, and icon
+src/cli/                  CLI entry point
+src/engine/               Shared copy engine and public headers
+src/ui/                   WebView2 UI source
+proto/prototype/           Archived Python prototype
+proto/tests/               Native smoke test and benchmark runner
+proto/benchmark/           Historical Python benchmark data
+scripts/                   Build and UI bundling scripts
+docs/                      Developer documentation
+docs/distribution/         User documentation included in releases
+build/intermediate/        Generated UI and resource object
+dist/                      Generated release binaries
 ```

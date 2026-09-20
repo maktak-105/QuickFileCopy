@@ -1,3 +1,4 @@
+# Python and test caches
 # Build output & intermediate files
 build/
 dist/*
@@ -19,12 +20,31 @@ env/
 *.egg-info/
 .env
 
+# Editors and local tools
 # Editors & local tools
 .vscode/
 .idea/
 .claude/
 CODEX_PROJECT_NOTE.txt
 
+# C++ and CMake outputs
+build/
+
+# Distribution binaries are generated; distribution documents are retained.
+dist/*.zip
+
+# Benchmark data generated on local machines
+python/benchmark/testdata/
+python/benchmark/**/results/*.json
+
+# Prototype build outputs
+python/prototype/*.dist/
+python/prototype/*.build/
+python/prototype/*.onefile-build/
+
+# Reference repositories and logs
+reference/
+*.log
 # Benchmark & test data
 proto/benchmark/testdata/
 proto/benchmark/**/results/*.json
@@ -32,3 +52,5 @@ proto/prototype/*.dist/
 proto/prototype/*.build/
 proto/prototype/*.onefile-build/
 *.dat
+*_debug.log
+CODEX_PROJECT_NOTE.txt

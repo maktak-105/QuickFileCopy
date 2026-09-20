@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Install MinGW-w64
         shell: pwsh
@@ -72,15 +74,11 @@ jobs:
           $zipPath = Join-Path $env:GITHUB_WORKSPACE 'QuickFileCopy-binary.zip'
           $zipHash = (Get-FileHash -Algorithm SHA256 -Path $zipPath).Hash.ToUpper()
           $lines += "$zipHash  QuickFileCopy-binary.zip"
-          $lines += ""
-          $lines += "# Binaries inside archive:"
           $binFiles = @('dist/QuickFileCopy.exe', 'dist/QuickFileCopy_cli.exe', 'dist/WebView2Loader.dll')
           foreach ($f in $binFiles) {
-            if (Test-Path -LiteralPath $f) {
-              $h = (Get-FileHash -Algorithm SHA256 -Path $f).Hash.ToUpper()
-              $name = Split-Path -Leaf $f
-              $lines += "$h  $name"
-            }
+            $h = (Get-FileHash -Algorithm SHA256 -Path $f).Hash.ToUpper()
+            $name = Split-Path -Leaf $f
+            $lines += "$h  $name"
           }
           $lines | Set-Content -Path $checksumFile -Encoding utf8
 

@@ -1,4 +1,7 @@
 QuickFileCopy - Change log
+v1.1.0 (2026-09-20)
+- Fixed build and release packaging after the folder restructure.
+
 
 v1.0.0 (2026-08-22)
 - First public release of the native GUI and CLI.

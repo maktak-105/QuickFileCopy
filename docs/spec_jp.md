@@ -8,13 +8,13 @@
 - 目的: Windows上のファイル・フォルダーを少ない設定で高速かつ安全にコピーする
 - 対象OS: Windows 10 / 11 (64-bit)
 - 実装: C++20 (MinGW-w64) + Win32 + WebView2 + HTML/CSS/バニラJavaScript
-- バージョン: v1.0.0
+- バージョン: v1.1.0
 - 配布形態: フラット構成のZIP
 
 ## 2. アーキテクチャ
 
 ```text
-[templates/index.html]
+[src/ui/index.html]
         ↓ bundle_html.py
 [EXE埋め込みHTML] ←WebMessage(JSON)→ [webview_main.cpp]
                                            ↓
@@ -26,7 +26,7 @@
 - `copy_engine.cpp`: GUI非依存の走査、判定、コピー、検証、メタデータ保持
 - `webview_main.cpp`: Win32ウィンドウ、WebView2、フォルダー選択、UACワーカー、JSON変換
 - `main_cli.cpp`: 同じコピーエンジンを使用するCLI
-- `templates/index.html`: フレームワーク非依存の自己完結UI。ビルド時にEXEリソースへ格納
+- `src/ui/index.html`: フレームワーク非依存の自己完結UI。ビルド時にEXEリソースへ格納
 
 ## 3. 画面構成
 

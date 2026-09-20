@@ -1,4 +1,8 @@
 # QuickFileCopy 変更履歴
+## v1.1.0 — 2026-09-20
+
+- フォルダ構成移行後のビルド・配布パスとリリース検証を修正。
+
 [English HISTORY.md](HISTORY.md)
 
 ## バージョン命名規則

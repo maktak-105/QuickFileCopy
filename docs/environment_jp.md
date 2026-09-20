@@ -19,7 +19,7 @@
 winget install --id BrechtSanders.WinLibs.MCF.UCRT --exact --source winget
 ```
 
-`build_native.py`はPATHに加えて、WinGetの標準パッケージ位置も検索します。
+`scripts/build.py`はPATHに加えて、WinGetの標準パッケージ位置も検索します。
 
 ### WebView2 SDK
 
@@ -40,12 +40,12 @@ C:\tools\webview2\build\native\x64\WebView2Loader.dll
 
 ```powershell
 cd C:\path\to\QuickFileCopy
-build.bat
+scripts\build.bat
 ```
 
 内部処理:
 
-1. `bundle_html.py`が`templates/index.html`を生成リソースへコピー
+1. `scripts/bundle_html.py`が`src/ui/index.html`を`build/intermediate/QuickFileCopy.html`へコピー
 2. `windres`がアイコン、HTML、VERSIONINFOをリソースオブジェクト化
 3. CLI版をコンパイル
 4. GUI版をコンパイル
@@ -56,22 +56,22 @@ build.bat
 
 | ファイル | 説明 |
 | --- | --- |
-| `dist/binary/QuickFileCopy.exe` | GUI版。HTMLを内蔵 |
-| `dist/binary/QuickFileCopy_cli.exe` | CLI版 |
-| `dist/binary/WebView2Loader.dll` | WebView2ローダー |
+| `dist/QuickFileCopy.exe` | GUI版。HTMLを内蔵 |
+| `dist/QuickFileCopy_cli.exe` | CLI版 |
+| `dist/WebView2Loader.dll` | WebView2ローダー |
 
 外部の`index.html`およびエンジンDLLは必要ありません。
 
 ## テスト
 
 ```powershell
-python python\tests\native_smoke.py
+python proto\tests\native_smoke.py
 ```
 
 性能測定:
 
 ```powershell
-python python\tests\benchmark_native.py --profile small --destination-root D:\qfc-bench --workers 1,4,8,16
+python proto\tests\benchmark_native.py --profile small --destination-root D:\qfc-bench --workers 1,4,8,16
 ```
 
 ## トラブルシューティング
@@ -88,17 +88,16 @@ python python\tests\benchmark_native.py --profile small --destination-root D:\qf
 ## フォルダ構成
 
 ```text
-core/native/include/qfc/  公開エンジンヘッダー
-core/native/src/          エンジン、WebView2ホスト、CLI
-core/native/resources/    RC、アイコン/HTMLのリソース定義
-python/prototype/         旧Pythonプロトタイプ
-python/tests/             ネイティブCLIのスモークとベンチマーク
-python/benchmark/         旧Python試作の計測記録
-templates/                開発用WebView2 UI
-static/                   将来のCSS/JS/画像分離先
-assets/                   アイコン原本・公開用画像
-document/                 開発者向け文書
-plans/                    計画・実施結果
-dist/binary/              生成バイナリ
-dist/documents/           配布同梱文書
+src/app/                  GUIホスト、RCリソース、アイコン
+src/cli/                  CLIエントリーポイント
+src/engine/               共有コピーエンジンと公開ヘッダー
+src/ui/                   WebView2 UIソース
+proto/prototype/           保存済みPythonプロトタイプ
+proto/tests/               ネイティブスモークとベンチマーク
+proto/benchmark/           過去のPython計測データ
+scripts/                   ビルドとUIバンドル
+docs/                      開発者向け文書
+docs/distribution/         リリース同梱のユーザー文書
+build/intermediate/        生成UIとリソースオブジェクト
+dist/                      生成リリースバイナリ
 ```

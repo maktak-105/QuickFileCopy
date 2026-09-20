@@ -8,13 +8,13 @@
 - Purpose: Copy files and folders quickly and safely on Windows with minimal configuration
 - Supported OS: Windows 10 / 11 (64-bit)
 - Implementation: C++20 (MinGW-w64) + Win32 + WebView2 + HTML/CSS/vanilla JavaScript
-- Version: v1.0.0
+- Version: v1.1.0
 - Distribution: Flat ZIP archive
 
 ## 2. Architecture
 
 ```text
-[templates/index.html]
+[src/ui/index.html]
         ↓ bundle_html.py
 [HTML embedded in EXE] ←WebMessage(JSON)→ [webview_main.cpp]
                                                 ↓
@@ -26,7 +26,7 @@
 - `copy_engine.cpp`: GUI-independent scanning, decision, copy, verification, and metadata preservation
 - `webview_main.cpp`: Win32 window, WebView2, folder selection, UAC worker, and JSON conversion
 - `main_cli.cpp`: CLI using the same copy engine
-- `templates/index.html`: Framework-independent, self-contained UI embedded in the EXE at build time
+- `src/ui/index.html`: Framework-independent, self-contained UI embedded in the EXE at build time
 
 ## 3. Screen Layout
 

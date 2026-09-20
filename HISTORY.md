@@ -1,4 +1,8 @@
 # QuickFileCopy Changelog
+## v1.1.0 — 2026-09-20
+
+- Fixed the project restructure, build/package paths, and release verification.
+
 [日本語版 HISTORY_jp.md](HISTORY_jp.md)
 
 ## Versioning rules
